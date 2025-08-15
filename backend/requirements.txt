@@ -1,0 +1,22 @@
+# FastAPI & Async
+fastapi
+uvicorn[standard]
+asyncpg
+sqlalchemy[asyncio]
+
+# AI & LangChain
+langchain
+langchain-google-genai
+langchain-pinecone
+
+
+# Data & Validation
+pydantic
+python-multipart
+python-dotenv
+
+# Date/Time Processing
+python-dateutil
+
+# Async utilities
+asyncio
