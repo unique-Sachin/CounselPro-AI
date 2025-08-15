@@ -21,13 +21,13 @@ class CounselorUpdate(BaseModel):
     mobile_number: Optional[str] = None
 
 
-# Schema for reading counselor data
+# Schema for reading counselor data (without internal integer id)
 class CounselorResponse(BaseModel):
-    id: UUID
+    uid: UUID
     name: str
     employee_id: str
     dept: str
     email: EmailStr
     mobile_number: str
 
-    model_config = {"from_attributes": True}  # replaces orm_mode
+    model_config = {"from_attributes": True}

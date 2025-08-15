@@ -1,17 +1,15 @@
 from fastapi import FastAPI
 from db.database import create_tables
 from routes.counselor_route import router as counselor_router
+from routes.session_route import router as session_router
 from contextlib import asynccontextmanager
 import uvicorn
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup code
     await create_tables()
     yield
-    # Shutdown code (if any)
-    # e.g., closing database connections
 
 
 app = FastAPI(
@@ -22,6 +20,7 @@ app = FastAPI(
 )
 
 app.include_router(counselor_router)
+app.include_router(session_router)
 
 
 @app.get("/", tags=["Health Check"])
