@@ -14,6 +14,10 @@ langchain-pinecone
 pydantic
 python-multipart
 python-dotenv
+requests
+
+# Audio Processing & Transcription
+deepgram-sdk>=3.0,<4.0
 
 # Date/Time Processing
 python-dateutil
