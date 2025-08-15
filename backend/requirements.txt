@@ -12,6 +12,7 @@ langchain-pinecone
 
 # Data & Validation
 pydantic
+email-validator
 python-multipart
 python-dotenv
 requests
