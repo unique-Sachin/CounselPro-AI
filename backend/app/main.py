@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from db.database import create_tables
 from routes.counselor_route import router as counselor_router
 from routes.session_route import router as session_router
+from routes.video_analysis_route import router as video_analysis_router
 from contextlib import asynccontextmanager
 import uvicorn
 
@@ -36,6 +37,7 @@ app.add_middleware(
 
 app.include_router(counselor_router)
 app.include_router(session_router)
+app.include_router(video_analysis_router)
 
 
 @app.get("/", tags=["Health Check"])
