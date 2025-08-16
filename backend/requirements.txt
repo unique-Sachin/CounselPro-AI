@@ -21,3 +21,7 @@ python-dateutil
 
 # Async utilities
 asyncio
+
+celery
+flower
+redis
