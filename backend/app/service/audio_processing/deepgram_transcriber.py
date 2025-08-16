@@ -74,10 +74,10 @@ class DeepgramTranscriber:
             payload: FileSource = {"buffer": audio_file.read()}
         
         start_time = time.time()
-        response = self.client.listen.prerecorded.v("1").transcribe_file(payload, options) # type: ignore
+        response = self.client.listen.rest.v("1").transcribe_file(payload, options)  # type: ignore
         processing_time = time.time() - start_time
         
-        utterances = self._extract_utterances(response.to_dict()) # type: ignore
+        utterances = self._extract_utterances(response.to_dict())  # type: ignore
         
         formatted_output = {
             "metadata": {

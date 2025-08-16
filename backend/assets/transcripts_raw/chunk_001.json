@@ -2,9 +2,9 @@
   "metadata": {
     "chunk_index": 1,
     "chunk_file": "backend/assets/audio_chunks/test_chunk_001.wav",
-    "processing_time_seconds": 5.06,
+    "processing_time_seconds": 14.75,
     "deepgram_model": "nova-2",
-    "timestamp": "2025-08-15T23:35:03Z",
+    "timestamp": "2025-08-15T23:56:40Z",
     "api_version": "v1"
   },
   "utterances": [
