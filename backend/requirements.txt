@@ -19,6 +19,11 @@ pydantic
 email-validator
 python-multipart
 python-dotenv
+requests
+psycopg2
+
+# Audio Processing & Transcription
+deepgram-sdk
 
 # Date/Time Processing
 python-dateutil
