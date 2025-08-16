@@ -1,0 +1,116 @@
+import { apiHelpers } from "@/lib/api";
+import { 
+  SessionResponse, 
+  SessionCreate, 
+  SessionUpdate, 
+  PaginatedResponse, 
+  PaginationParams 
+} from "@/lib/types";
+
+// List sessions with pagination
+// Note: Backend doesn't currently have GET /sessions endpoint, returning empty data
+export const listSessions = async (params: PaginationParams = { skip: 0, limit: 10 }) => {
+  // Since the backend doesn't have a general list sessions endpoint (only by-counselor),
+  // we return empty data structure for now
+  console.info("Sessions list endpoint not available on backend, returning empty data");
+  return {
+    items: [],
+    total: 0,
+    skip: params.skip || 0,
+    limit: params.limit || 10,
+  } as PaginatedResponse<SessionResponse>;
+  
+  /* 
+  // Uncomment this when backend implements GET /sessions endpoint
+  try {
+    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>("/sessions", params as Record<string, unknown>);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch sessions:", error);
+    // Return empty result structure for graceful UI handling
+    return {
+      items: [],
+      total: 0,
+      skip: params.skip || 0,
+      limit: params.limit || 10,
+    } as PaginatedResponse<SessionResponse>;
+  }
+  */
+};
+
+// Create a new session
+export const createSession = async (body: SessionCreate) => {
+  try {
+    const response = await apiHelpers.post<SessionResponse>("/sessions", body);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to create session:", error);
+    throw error; // Re-throw to let the UI handle the error
+  }
+};
+
+// Get a specific session by ID or UID (accepts string)
+export const getSession = async (idOrUid: string) => {
+  try {
+    const response = await apiHelpers.get<SessionResponse>(`/sessions/${idOrUid}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch session:", error);
+    throw error; // Re-throw to let the UI handle the error
+  }
+};
+
+// Update a session by ID or UID
+export const updateSession = async (idOrUid: string, body: SessionUpdate) => {
+  try {
+    const response = await apiHelpers.put<SessionResponse>(`/sessions/${idOrUid}`, body);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to update session:", error);
+    throw error; // Re-throw to let the UI handle the error
+  }
+};
+
+// Delete a session by ID or UID
+export const deleteSession = async (idOrUid: string) => {
+  try {
+    const response = await apiHelpers.del<{ message: string }>(`/sessions/${idOrUid}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to delete session:", error);
+    throw error; // Re-throw to let the UI handle the error
+  }
+};
+
+// List sessions by counselor ID with pagination
+export const listSessionsByCounselor = async (
+  counselorIdNumber: number, 
+  params: PaginationParams = { skip: 0, limit: 10 }
+) => {
+  try {
+    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>(
+      `/sessions/by-counselor/${counselorIdNumber}`, 
+      params as Record<string, unknown>
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch sessions by counselor:", error);
+    // Return empty result structure for graceful UI handling
+    return {
+      items: [],
+      total: 0,
+      skip: params.skip || 0,
+      limit: params.limit || 10,
+    } as PaginatedResponse<SessionResponse>;
+  }
+};
+
+// Export all session services as default
+export const sessionService = {
+  listSessions,
+  createSession,
+  getSession,
+  updateSession,
+  deleteSession,
+  listSessionsByCounselor,
+};
