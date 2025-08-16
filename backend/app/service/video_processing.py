@@ -8,6 +8,7 @@ import ffmpeg
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+from audio_processing.deepgram_transcriber import DeepgramTranscriber
 
 # Define the scopes for Google Drive API access.
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
@@ -103,7 +104,7 @@ class VideoProcessor:
             bool: True if a face is detected (camera is on), False otherwise.
         """
         # Load the pre-trained Haar Cascade for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml') # type: ignore
         
         if face_cascade.empty():
             print("Error loading face cascade XML file.")
@@ -192,7 +193,28 @@ class VideoProcessor:
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
             
             print(f"Audio extracted successfully to: {audio_path}")
-            return audio_path
+            
+            # Initialize Deepgram transcriber and transcribe the audio
+            try:
+                print("Starting transcription with Deepgram...")
+                transcriber = DeepgramTranscriber()
+                transcript_path = transcriber.transcribe_chunk(audio_path, 1)
+                print(f"Transcription completed successfully: {transcript_path}")
+                
+                # Return both audio path and transcript path
+                return {
+                    "audio_path": audio_path,
+                    "transcript_path": transcript_path
+                }
+                
+            except Exception as transcription_error:
+                print(f"Warning: Transcription failed: {transcription_error}")
+                # Return just the audio path if transcription fails
+                return {
+                    "audio_path": audio_path,
+                    "transcript_path": None,
+                    "transcription_error": str(transcription_error)
+                }
             
         except Exception as e:
             print(f"Error extracting audio: {e}")
@@ -255,9 +277,9 @@ class VideoProcessor:
             duration = frame_count / fps if fps > 0 else 0
             cap.release()
             
-            # Extract audio for Whisper processing
+            # Extract audio and transcribe it
             print("Extracting audio from video...")
-            audio_path = self.extract_audio(video_path, temp_dir)
+            audio_result = self.extract_audio(video_path, temp_dir)
             
             # Construct the response
             results = {
@@ -266,7 +288,9 @@ class VideoProcessor:
                 "video_duration": round(duration, 2),
                 "frame_count": frame_count,
                 "fps": round(fps, 2),
-                "audio_path": audio_path
+                "audio_path": audio_result.get("audio_path"),
+                "transcript_path": audio_result.get("transcript_path"),
+                "transcription_error": audio_result.get("transcription_error")
             }
             
             return results

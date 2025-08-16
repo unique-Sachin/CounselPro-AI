@@ -28,24 +28,84 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle common errors here
-    if (error.response?.status === 401) {
-      // Handle unauthorized error
+    // Standardize common error handling with clearer mapping
+    const status = error?.response?.status as number | undefined;
+    const code = error?.code as string | undefined; // e.g. ECONNABORTED on timeout
+    const method = (error?.config?.method || "").toUpperCase();
+    const url = error?.config?.url || "";
+
+    // 1) Timeout (Axios sets code ECONNABORTED) or HTTP 408
+    if (code === "ECONNABORTED" || status === 408) {
+      console.warn(`Request timed out: ${method} ${url}`);
+      const configuredTimeoutMs = (api.defaults && typeof api.defaults.timeout === "number")
+        ? api.defaults.timeout
+        : 10000;
+      const timeoutSeconds = Math.round(configuredTimeoutMs / 1000);
+      toast.error("Request timed out", {
+        description: `The ${method || "request"} to ${url} exceeded ${timeoutSeconds}s. Please try again.`,
+      });
+      return Promise.reject(error);
+    }
+
+    // 2) Network error (no response) — offline/CORS/server unreachable
+    if (!error?.response) {
+      const isOffline = typeof navigator !== "undefined" && navigator && navigator.onLine === false;
+      if (isOffline) {
+        toast.error("You appear to be offline", {
+          description: "Check your internet connection and try again.",
+        });
+      } else {
+        console.warn(`Network error contacting API: ${method} ${url}`);
+        toast.error("Network error", {
+          description: "Couldn’t reach the API server. Please try again shortly.",
+        });
+      }
+      return Promise.reject(error);
+    }
+
+    // 3) Auth error
+    if (status === 401) {
       console.log("Unauthorized access");
       toast.error("Unauthorized access. Please log in again.");
-    } else if (error.response?.status === 422) {
-      // Handle validation errors
+      return Promise.reject(error);
+    }
+
+    // 4) Validation errors
+    if (status === 422) {
       const detail = error.response?.data?.detail || "Validation error";
       console.log("Validation error:", detail);
-      toast.error(`Validation error: ${detail}`);
-      
+      toast.error("Validation error", { description: String(detail) });
       // Special handling for session ID format issues
-      if (detail.includes("session_id") || detail.includes("invalid format")) {
-        toast.error("Backend API expects different ID format. Please check with backend team for alignment.");
+      if (String(detail).includes("session_id") || String(detail).includes("invalid format")) {
+        toast.error("ID format mismatch", {
+          description: "Backend expects a different ID format. Please verify the identifier.",
+        });
       }
-    } else if (error.response?.status >= 500) {
-      toast.error("Server error. Please try again later.");
+      return Promise.reject(error);
     }
+
+    // 5) Method not allowed — likely endpoint not implemented
+    if (status === 405) {
+      console.warn(`Method not allowed (405): ${method} ${url}`);
+      // Don’t toast by default to avoid noise in UI; console warning is enough
+      return Promise.reject(error);
+    }
+
+    // 6) Rate limited
+    if (status === 429) {
+      toast.error("Too many requests", {
+        description: "You’re being rate limited. Please slow down and try again in a moment.",
+      });
+      return Promise.reject(error);
+    }
+
+    // 7) Server errors
+    if (status && status >= 500) {
+      toast.error("Server error", { description: "Please try again later." });
+      return Promise.reject(error);
+    }
+
+    // Fallback
     return Promise.reject(error);
   }
 );
