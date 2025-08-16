@@ -37,6 +37,7 @@ async def analyze_video(request: VideoAnalysisRequest):
             video_duration=results.get("video_duration"),
             frame_count=results.get("frame_count"),
             fps=results.get("fps"),
+            audio_path=results.get("audio_path"),
             analysis_success=True,
             error_message=None
         )
@@ -51,6 +52,7 @@ async def analyze_video(request: VideoAnalysisRequest):
             video_duration=None,
             frame_count=None,
             fps=None,
+            audio_path=None,
             analysis_success=False,
             error_message=str(e)
         )
