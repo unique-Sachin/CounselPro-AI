@@ -4,6 +4,7 @@ import tempfile
 import shutil
 import os
 import io
+import ffmpeg
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -157,6 +158,46 @@ class VideoProcessor:
         """
         return "Professional"
 
+    def extract_audio(self, video_path: str, temp_dir: str):
+        """
+        Extracts audio from a video file using ffmpeg.
+        
+        This function extracts audio in WAV format (16-bit, 16kHz) which is
+        optimal for Whisper models and other speech recognition systems.
+        
+        Args:
+            video_path (str): Path to the input video file.
+            temp_dir (str): Temporary directory to store the extracted audio.
+            
+        Returns:
+            str: Path to the extracted audio file.
+            
+        Raises:
+            Exception: If audio extraction fails.
+        """
+        try:
+            # Generate output audio filename
+            audio_filename = 'extracted_audio.wav'
+            audio_path = os.path.join(temp_dir, audio_filename)
+            
+            # Extract audio using ffmpeg with optimal settings for Whisper
+            # 16-bit, 16kHz, mono - these are the recommended settings
+            stream = ffmpeg.input(video_path)
+            stream = ffmpeg.output(stream, audio_path,
+                                 acodec='pcm_s16le',  # 16-bit PCM
+                                 ar='16000',           # 16kHz sample rate
+                                 ac='1')               # mono channel
+            
+            # Run the ffmpeg command
+            ffmpeg.run(stream, overwrite_output=True, quiet=True)
+            
+            print(f"Audio extracted successfully to: {audio_path}")
+            return audio_path
+            
+        except Exception as e:
+            print(f"Error extracting audio: {e}")
+            raise Exception(f"Failed to extract audio from video: {str(e)}")
+
 
 
     async def analyze_video(self, video_url: str):
@@ -214,13 +255,18 @@ class VideoProcessor:
             duration = frame_count / fps if fps > 0 else 0
             cap.release()
             
+            # Extract audio for Whisper processing
+            print("Extracting audio from video...")
+            audio_path = self.extract_audio(video_path, temp_dir)
+            
             # Construct the response
             results = {
                 "camera_status": "On" if camera_on else "Off",
                 "attire_status": attire_status,
                 "video_duration": round(duration, 2),
                 "frame_count": frame_count,
-                "fps": round(fps, 2)
+                "fps": round(fps, 2),
+                "audio_path": audio_path
             }
             
             return results
