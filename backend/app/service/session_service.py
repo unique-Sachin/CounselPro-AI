@@ -1,5 +1,6 @@
 import logging
 from uuid import UUID
+from service.video_processing.video_processing import VideoProcessor
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -104,3 +105,28 @@ async def delete_session(db: AsyncSession, session_uid: UUID):
         raise HTTPException(
             status_code=500, detail="Internal server error while deleting session"
         )
+
+
+async def process_video_background(session_uid: UUID, video_url: str):
+    """
+    Background task to process video for a counseling session.
+    This function runs asynchronously after session creation.
+    """
+    try:
+        logger.info(f"Starting video processing for session {session_uid}")
+
+        # Initialize video processor
+        video_processor = VideoProcessor()
+
+        # Process the video
+        results = await video_processor.analyze_video(video_url)
+
+        logger.info(f"Video processing completed for session {session_uid}")
+        logger.info(f"Results: {results}")
+
+        # Here you can add logic to store the results in the database
+        # or send them to another service for further processing
+
+    except Exception as e:
+        logger.error(f"Error processing video for session {session_uid}: {e}")
+        # You might want to update the session status to indicate processing failed

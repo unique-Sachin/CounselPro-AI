@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -11,6 +11,7 @@ from service.session_service import (
     get_sessions_by_counselor,
     update_session,
     delete_session,
+    process_video_background,
 )
 
 router = APIRouter(prefix="/sessions", tags=["Counseling Sessions"])
@@ -18,9 +19,21 @@ router = APIRouter(prefix="/sessions", tags=["Counseling Sessions"])
 
 @router.post("/", response_model=SessionResponse)
 async def create_counseling_session(
-    session_in: SessionCreate, db: AsyncSession = Depends(get_async_db)
+    session_in: SessionCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_async_db)
 ):
-    return await create_session(db, session_in)
+    # Create the session first
+    session = await create_session(db, session_in)
+
+    # Add video processing as background task
+    background_tasks.add_task(
+        process_video_background,
+        session.uid,
+        str(session.recording_link)
+    )
+
+    return session
 
 
 @router.get("/{session_id}", response_model=SessionResponse)
