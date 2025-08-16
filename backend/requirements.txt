@@ -3,6 +3,10 @@ fastapi
 uvicorn[standard]
 asyncpg
 sqlalchemy[asyncio]
+aiosqlite
+
+# PostgreSQL support
+psycopg2-binary
 
 # AI & LangChain
 langchain
@@ -21,3 +25,13 @@ python-dateutil
 
 # Async utilities
 asyncio
+
+# Video Processing
+opencv-python
+numpy
+requests
+
+# Google API Dependencies
+google-api-python-client
+google-auth
+
