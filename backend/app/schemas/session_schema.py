@@ -23,11 +23,20 @@ class SessionUpdate(BaseModel):
     recording_link: HttpUrl | None = None
 
 
+# Counselor sub-schema (for response only)
+class CounselorInfo(BaseModel):
+    uid: str
+    name: str
+
+    model_config = {"from_attributes": True}
+
+
 # Response schema
 class SessionResponse(BaseModel):
     uid: UUID
     description: str
     session_date: datetime
     recording_link: HttpUrl
+    counselor: CounselorInfo  # 👈 nested counselor info
 
     model_config = {"from_attributes": True}

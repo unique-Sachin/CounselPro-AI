@@ -1,12 +1,25 @@
 import logging
 import sys
 
-# Define log format
-LOG_FORMAT = "[%(levelname)s] %(asctime)s | %(name)s | %(message)s"
+# Create a logger for your app
+logger = logging.getLogger("counselpro")
+logger.setLevel(logging.DEBUG)  # or INFO in production
 
-# Configure root logger
-logging.basicConfig(
-    level=logging.DEBUG,  # Global log level
-    format=LOG_FORMAT,
-    handlers=[logging.StreamHandler(sys.stdout)],  # Console output
-)
+# Check if handlers already exist
+if not logger.handlers:
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+
+    # Formatter
+    formatter = logging.Formatter(
+        "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+    )
+    console_handler.setFormatter(formatter)
+
+    # Add handler to logger
+    logger.addHandler(console_handler)
+
+# Optional: integrate SQLAlchemy logging
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+logging.getLogger("sqlalchemy.engine").addHandler(console_handler)
