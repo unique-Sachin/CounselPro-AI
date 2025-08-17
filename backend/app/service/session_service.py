@@ -1,6 +1,8 @@
 import logging
 from uuid import UUID
 from service.video_processing.video_processing import VideoProcessor
+from service.audio_processing.deepgram_transcriber import DeepgramTranscriber
+from service.course_verification.course_verifier import CourseVerifier
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -113,7 +115,7 @@ async def process_video_background(session_uid: UUID, video_url: str):
     This function runs asynchronously after session creation.
     """
     try:
-        logger.info(f"Starting video processing for session {session_uid}")
+        print(f"Starting video processing for session {session_uid}")
 
         # Initialize video processor
         video_processor = VideoProcessor()
@@ -121,8 +123,64 @@ async def process_video_background(session_uid: UUID, video_url: str):
         # Process the video
         results = await video_processor.analyze_video(video_url)
 
-        logger.info(f"Video processing completed for session {session_uid}")
-        logger.info(f"Results: {results}")
+        audio_path = results.get("audio_path")
+        # If transcription wasn't already done in video processing, do it here
+        if audio_path:
+            try:
+                print(f"Starting Deepgram transcription for audio: {audio_path}")
+                transcriber = DeepgramTranscriber()
+                transcript_path = transcriber.transcribe_chunk(audio_path, str(session_uid))
+                print(f"Transcription completed: {transcript_path}")
+                # Add transcript path to results
+                results["transcript_path"] = transcript_path
+            except Exception as transcription_error:
+                print(f"Warning: Transcription failed: {transcription_error}")
+                results["transcription_error"] = str(transcription_error)
+            
+        
+        print(f"Video processing completed for session {session_uid}")
+        print(f"Results: {results}")
+
+        # Verify course information if transcription was successful
+        if results.get("transcript_path"):
+            try:
+                print(f"Starting course verification for session {session_uid}")
+                
+                # Load transcript data
+                import json
+                with open(results["transcript_path"], 'r', encoding='utf-8') as f:
+                    transcript_data = json.load(f)
+                
+                # Initialize course verifier
+                verifier = CourseVerifier()
+                
+                # Verify course information
+                verification_result = verifier.verify_full_transcript(transcript_data)
+                
+                # Save verification results
+                from pathlib import Path
+                verification_dir = Path("assets/verification_results")
+                verification_dir.mkdir(parents=True, exist_ok=True)
+                
+                verification_file = verification_dir / f"verification_{session_uid}.json"
+                with open(verification_file, 'w', encoding='utf-8') as f:
+                    json.dump(verification_result, f, indent=2, ensure_ascii=False)
+                
+                results["verification_path"] = str(verification_file)
+                results["accuracy_score"] = str(verification_result["accuracy_score"])
+                results["red_flags_count"] = str(len(verification_result["red_flags"]))
+                
+                print(f"Course verification completed: {verification_file}")
+                print(f"Accuracy score: {verification_result['accuracy_score']:.2f}")
+                
+                if verification_result["red_flags"]:
+                    print(f"⚠️  {len(verification_result['red_flags'])} red flags detected:")
+                    for flag in verification_result["red_flags"]:
+                        print(f"   • {flag}")
+                
+            except Exception as verification_error:
+                print(f"Warning: Course verification failed: {verification_error}")
+                results["verification_error"] = str(verification_error)
 
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing

@@ -10,8 +10,15 @@ psycopg2-binary
 
 # AI & LangChain
 langchain
+langchain-community
 langchain-google-genai
 langchain-pinecone
+langchain-openai
+langchain-core
+pinecone
+pypdf
+python-docx
+docx2txt
 
 
 # Data & Validation

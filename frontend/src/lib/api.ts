@@ -1,9 +1,9 @@
-import axios, { AxiosResponse } from "axios";
+import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import { toast } from "sonner";
 
 export const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000",
-  timeout: 10000,
+  // timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -34,15 +34,12 @@ api.interceptors.response.use(
     const method = (error?.config?.method || "").toUpperCase();
     const url = error?.config?.url || "";
 
-    // 1) Timeout (Axios sets code ECONNABORTED) or HTTP 408
+    // 1) Client timeout (ECONNABORTED) or HTTP 408
+    // We do not set a client timeout; if seen, surface a minimal notice.
     if (code === "ECONNABORTED" || status === 408) {
-      console.warn(`Request timed out: ${method} ${url}`);
-      const configuredTimeoutMs = (api.defaults && typeof api.defaults.timeout === "number")
-        ? api.defaults.timeout
-        : 10000;
-      const timeoutSeconds = Math.round(configuredTimeoutMs / 1000);
-      toast.error("Request timed out", {
-        description: `The ${method || "request"} to ${url} exceeded ${timeoutSeconds}s. Please try again.`,
+      console.warn(`Request timed out/canceled by client: ${method} ${url}`);
+      toast.error("Request canceled by client", {
+        description: "The request did not complete. Please retry.",
       });
       return Promise.reject(error);
     }
@@ -112,19 +109,19 @@ api.interceptors.response.use(
 
 // Helper functions
 export const apiHelpers = {
-  get: <T>(url: string, params?: Record<string, unknown>): Promise<AxiosResponse<T>> => {
-    return api.get(url, { params });
+  get: <T>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return api.get(url, { params, ...(config || {}) });
   },
 
-  post: <T>(url: string, data?: unknown): Promise<AxiosResponse<T>> => {
-    return api.post(url, data);
+  post: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return api.post(url, data, config);
   },
 
-  put: <T>(url: string, data?: unknown): Promise<AxiosResponse<T>> => {
-    return api.put(url, data);
+  put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return api.put(url, data, config);
   },
 
-  del: <T>(url: string, params?: Record<string, unknown>): Promise<AxiosResponse<T>> => {
-    return api.delete(url, { params });
+  del: <T>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
+    return api.delete(url, { params, ...(config || {}) });
   },
 };

@@ -41,9 +41,15 @@ export const listSessions = async (params: PaginationParams = { skip: 0, limit: 
 // Create a new session
 export const createSession = async (body: SessionCreate) => {
   try {
-    const response = await apiHelpers.post<SessionResponse>("/sessions", body);
+  // Use default Axios (no timeout) so the request can run until the server completes.
+  const response = await apiHelpers.post<SessionResponse>("/sessions", body);
     return response.data;
   } catch (error) {
+    // Map timeout vs cancel distinctly for easier debugging
+    const err = error as { code?: string; message?: string };
+    if (err?.code === "ECONNABORTED") {
+      console.warn("createSession aborted due to timeout");
+    }
     console.error("Failed to create session:", error);
     throw error; // Re-throw to let the UI handle the error
   }

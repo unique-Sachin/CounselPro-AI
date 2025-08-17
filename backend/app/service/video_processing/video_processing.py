@@ -8,7 +8,6 @@ import ffmpeg
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-from audio_processing.deepgram_transcriber import DeepgramTranscriber
 
 # Define the scopes for Google Drive API access.
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
@@ -193,28 +192,8 @@ class VideoProcessor:
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
             
             print(f"Audio extracted successfully to: {audio_path}")
-            
-            # Initialize Deepgram transcriber and transcribe the audio
-            try:
-                print("Starting transcription with Deepgram...")
-                transcriber = DeepgramTranscriber()
-                transcript_path = transcriber.transcribe_chunk(audio_path, 1)
-                print(f"Transcription completed successfully: {transcript_path}")
-                
-                # Return both audio path and transcript path
-                return {
-                    "audio_path": audio_path,
-                    "transcript_path": transcript_path
-                }
-                
-            except Exception as transcription_error:
-                print(f"Warning: Transcription failed: {transcription_error}")
-                # Return just the audio path if transcription fails
-                return {
-                    "audio_path": audio_path,
-                    "transcript_path": None,
-                    "transcription_error": str(transcription_error)
-                }
+            return audio_path
+          
             
         except Exception as e:
             print(f"Error extracting audio: {e}")
@@ -251,46 +230,44 @@ class VideoProcessor:
             print("Successfully downloaded private video using authenticated API")
 
             # Perform the analysis
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                raise Exception("Failed to open video file for analysis")
+            # cap = cv2.VideoCapture(video_path)
+            # if not cap.isOpened():
+            #     raise Exception("Failed to open video file for analysis")
                 
-            ret, first_frame = cap.read()
-            cap.release()
+            # ret, first_frame = cap.read()
+            # cap.release()
             
-            if not ret:
-                raise Exception("Failed to read video frames")
+            # if not ret:
+            #     raise Exception("Failed to read video frames")
             
-            # Analyze camera status
-            camera_on = self.analyze_camera_status(video_path)
+            # # Analyze camera status
+            # camera_on = self.analyze_camera_status(video_path)
             
-            # Analyze attire if camera is on
-            if camera_on:
-                attire_status = self.analyze_attire(first_frame)
-            else:
-                attire_status = "Not applicable (camera off)"
+            # # Analyze attire if camera is on
+            # if camera_on:
+            #     attire_status = self.analyze_attire(first_frame)
+            # else:
+            #     attire_status = "Not applicable (camera off)"
             
-            # Get video metadata
-            cap = cv2.VideoCapture(video_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            duration = frame_count / fps if fps > 0 else 0
-            cap.release()
+            # # Get video metadata
+            # cap = cv2.VideoCapture(video_path)
+            # fps = cap.get(cv2.CAP_PROP_FPS)
+            # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # duration = frame_count / fps if fps > 0 else 0
+            # cap.release()
             
             # Extract audio and transcribe it
             print("Extracting audio from video...")
-            audio_result = self.extract_audio(video_path, temp_dir)
+            audio_path = self.extract_audio(video_path, temp_dir)
             
             # Construct the response
             results = {
-                "camera_status": "On" if camera_on else "Off",
-                "attire_status": attire_status,
-                "video_duration": round(duration, 2),
-                "frame_count": frame_count,
-                "fps": round(fps, 2),
-                "audio_path": audio_result.get("audio_path"),
-                "transcript_path": audio_result.get("transcript_path"),
-                "transcription_error": audio_result.get("transcription_error")
+                # "camera_status": "On" if camera_on else "Off",
+                # "attire_status": attire_status,
+                # "video_duration": round(duration, 2),
+                # "frame_count": frame_count,
+                # "fps": round(fps, 2),
+                "audio_path": audio_path,
             }
             
             return results
@@ -299,7 +276,7 @@ class VideoProcessor:
             print(f"An error occurred: {e}")
             raise e
             
-        finally:
-            # Cleanup: remove the temporary directory and its contents
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        # finally:
+        #     # Cleanup: remove the temporary directory and its contents
+        #     shutil.rmtree(temp_dir, ignore_errors=True)
 
