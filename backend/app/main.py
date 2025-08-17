@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 import traceback
 import logging
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +6,7 @@ from app.db.database import create_tables
 from app.routes.counselor_route import router as counselor_router
 from app.routes.session_route import router as session_router
 from app.routes.catalog_route import router as catalog_router
+from app.routes.session_analysis_route import router as session_analysis_router
 from contextlib import asynccontextmanager
 import uvicorn
 import time
@@ -16,6 +17,7 @@ import traceback
 import logging
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.log_config import get_logger
+from app.service.email_service import test_email_sending, test_modern_email_template
 
 # Initialize logger
 logger = get_logger("CounselPro")
@@ -80,11 +82,25 @@ async def log_requests(request: Request, call_next):
 app.include_router(counselor_router)
 app.include_router(session_router)
 app.include_router(catalog_router)
+app.include_router(session_analysis_router)
 
 
 @app.get("/", tags=["Health Check"])
 async def root():
     return {"message": "AI-Powered Counselor Excellence System"}
+
+
+@app.post("/email/test")
+async def test_email(email: str):
+    """
+    Test endpoint to verify email functionality
+    """
+    # success = await test_email_sending(email)
+    success = await test_modern_email_template(email)
+    if success:
+        return {"message": f"Test email sent successfully to {email}"}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to send test email")
 
 
 if __name__ == "__main__":
