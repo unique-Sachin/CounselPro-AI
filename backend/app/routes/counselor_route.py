@@ -1,15 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-from service.counselor_service import (
+from app.service.counselor_service import (
     create_counselor,
     get_counselor,
     update_counselor,
     delete_counselor,
     get_all_counselors,
 )
-from schemas.counselor_schema import CounselorCreate, CounselorUpdate, CounselorResponse
-from db.database import get_async_db
+from app.schemas.counselor_schema import (
+    CounselorCreate,
+    CounselorUpdate,
+    CounselorResponse,
+)
+from app.db.database import get_async_db
 
 router = APIRouter(prefix="/counselors", tags=["Counselors"])
 
@@ -18,6 +22,8 @@ router = APIRouter(prefix="/counselors", tags=["Counselors"])
 async def create_counselor_route(
     counselor: CounselorCreate, db: AsyncSession = Depends(get_async_db)
 ):
+    print("=" * 100)
+    print(f"Creating counselor with data: {counselor}")
     return await create_counselor(db, counselor)
 
 
@@ -38,7 +44,7 @@ async def update_counselor_route(
 
 
 @router.delete("/{counselor_id}", status_code=204)
-async def delete_counselor_endpoint(
+async def delete_counselor_route(
     counselor_uid: str,
     db: AsyncSession = Depends(get_async_db),
 ):
