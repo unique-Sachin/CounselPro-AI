@@ -98,36 +98,6 @@ async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionRespo
             status_code=500,
         )
 
-
-async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
-    try:
-        result = await db.execute(
-            select(CounselingSession)
-            .options(joinedload(CounselingSession.counselor))
-            .offset(skip)
-            .limit(limit)
-        )
-        sessions = result.scalars().all()
-
-        return [
-            SessionResponse(
-                uid=s.uid,
-                description=s.description,
-                session_date=s.session_date,
-                recording_link=s.recording_link,
-                counselor=CounselorInfo(uid=s.counselor.uid, name=s.counselor.name),
-            )
-            for s in sessions
-        ]
-    except SQLAlchemyError as e:
-        logger.error(f"Database error fetching all sessions: {e}")
-        raise BaseAppException(
-            error="Database Error",
-            details=str(e),
-            status_code=500,
-        )
-
-
 async def get_sessions_by_counselor(
     db: AsyncSession, counselor_uid: str, skip: int = 0, limit: int = 10
 ):

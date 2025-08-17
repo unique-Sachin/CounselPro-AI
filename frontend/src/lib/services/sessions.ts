@@ -82,17 +82,25 @@ export const deleteSession = async (idOrUid: string) => {
   }
 };
 
-// List sessions by counselor ID with pagination
+// List sessions by counselor UID with pagination
 export const listSessionsByCounselor = async (
-  counselorIdNumber: number, 
+  counselorUid: string, 
   params: PaginationParams = { skip: 0, limit: 10 }
 ) => {
   try {
-    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>(
-      `/sessions/by-counselor/${counselorIdNumber}`, 
+    const response = await apiHelpers.get<SessionResponse[]>(
+      `/sessions/by-counselor/${counselorUid}`, 
       params as Record<string, unknown>
     );
-    return response.data;
+    const sessions = response.data;
+    
+    // Transform the array response into paginated format
+    return {
+      items: sessions,
+      total: sessions.length,
+      skip: params.skip || 0,
+      limit: params.limit || 10,
+    } as PaginatedResponse<SessionResponse>;
   } catch (error) {
     console.error("Failed to fetch sessions by counselor:", error);
     // Return empty result structure for graceful UI handling
@@ -105,6 +113,42 @@ export const listSessionsByCounselor = async (
   }
 };
 
+// Get unique counselors from all sessions
+export const getCounselors = async () => {
+  try {
+    const allCounselors = new Map();
+    let skip = 0;
+    const limit = 100; // Maximum allowed by API
+    let hasMore = true;
+
+    while (hasMore) {
+      const sessionsData = await listSessions({ skip, limit });
+      
+      // Add counselors to our map
+      sessionsData.items.forEach(session => {
+        if (session.counselor && session.counselor.uid && session.counselor.name) {
+          allCounselors.set(session.counselor.uid, {
+            uid: session.counselor.uid,
+            name: session.counselor.name
+          });
+        }
+      });
+
+      // Check if we have more data to fetch
+      hasMore = sessionsData.items.length === limit;
+      skip += limit;
+
+      // Safety break to avoid infinite loops
+      if (skip > 1000) break;
+    }
+    
+    return Array.from(allCounselors.values());
+  } catch (error) {
+    console.error("Failed to fetch counselors:", error);
+    return [];
+  }
+};
+
 // Export all session services as default
 export const sessionService = {
   listSessions,
@@ -113,4 +157,5 @@ export const sessionService = {
   updateSession,
   deleteSession,
   listSessionsByCounselor,
+  getCounselors,
 };
