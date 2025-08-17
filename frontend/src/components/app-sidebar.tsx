@@ -10,7 +10,8 @@ import {
   Users, 
   MessageSquare,
   Settings,
-  PlayCircle
+  PlayCircle,
+  FolderOpen
 } from "lucide-react";
 
 const sidebarItems = [
@@ -28,6 +29,11 @@ const sidebarItems = [
     title: "Sessions",
     href: "/sessions",
     icon: MessageSquare,
+  },
+  {
+    title: "Catalogs",
+    href: "/catalogs",
+    icon: FolderOpen,
   },
   {
     title: "Demo",
@@ -55,7 +61,8 @@ export function AppSidebar({ className, onItemClick }: AppSidebarProps) {
       <nav className="flex-1 space-y-1 p-4">
         {sidebarItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive = pathname === item.href || 
+            (item.href !== "/" && pathname.startsWith(item.href));
           
           return (
             <Button
