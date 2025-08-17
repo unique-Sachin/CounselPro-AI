@@ -42,4 +42,5 @@ ffmpeg-python
 # Google API Dependencies
 google-api-python-client
 google-auth
+google-generativeai
 
