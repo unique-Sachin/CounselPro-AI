@@ -3,9 +3,13 @@ import io
 import ffmpeg
 import tempfile
 import numpy as np
+import logging
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Define the scopes for Google Drive API access.
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
@@ -17,8 +21,10 @@ class VideoExtractor:
     
     def __init__(self):
         """Initialize the video extractor"""
+        logger.info("Initializing VideoExtractor")
         self.service = None
         self.temp_dir = tempfile.mkdtemp()
+        logger.debug(f"Created temporary directory: {self.temp_dir}")
         
     def get_drive_service(self):
         """
@@ -31,20 +37,22 @@ class VideoExtractor:
             # Load service account credentials
             if os.path.exists('credentials.json'):
                 creds = service_account.Credentials.from_service_account_file(
-                    'credentials.json', 
+                    'credentials.json',
                     scopes=SCOPES
                 )
-                print("Successfully loaded service account credentials")
+                logger.info("Successfully loaded service account credentials")
             else:
-                raise FileNotFoundError("Service account key file 'credentials.json' not found")
-            
+                error_msg = "Service account key file 'credentials.json' not found"
+                logger.error(error_msg)
+                raise FileNotFoundError(error_msg)
+
             # Build the Drive service
             self.service = build('drive', 'v3', credentials=creds)
-            print("Successfully built Google Drive service")
+            logger.info("Successfully built Google Drive service")
             return self.service
-            
+
         except Exception as e:
-            print(f"Error setting up Google Drive service: {e}")
+            logger.error(f"Error setting up Google Drive service: {e}")
             raise Exception(f"Failed to authenticate with Google Drive: {str(e)}")
 
     def get_video_frames_and_audio_paths(self, video_url: str):
@@ -72,9 +80,11 @@ class VideoExtractor:
             elif '/id=' in video_url:
                 file_id = video_url.split('/id=')[1].split('&')[0]
             else:
-                raise ValueError("Invalid Google Drive URL format")
-            
-            print(f"📥 Starting video download and processing...")
+                error_msg = "Invalid Google Drive URL format. URL must contain '/file/d/' or '/id='"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+
+            logger.info(f"Starting video download and processing for file ID: {file_id}")
             
             # Download video to temporary file ONCE
             temp_video = os.path.join(self.temp_dir, 'temp_video.mp4')
@@ -87,13 +97,15 @@ class VideoExtractor:
             while not done:
                 status, done = downloader.next_chunk()
                 if not done:
-                    print(f"Download progress: {int(status.progress() * 100)}%")
-            
+                    progress = int(status.progress() * 100)
+                    if progress % 20 == 0:  # Log every 20% to reduce noise
+                        logger.info(f"Download progress: {progress}%")
+
             file_content.seek(0)
             with open(temp_video, 'wb') as f:
                 f.write(file_content.getvalue())
-            
-            print("✅ Video downloaded, processing...")
+
+            logger.info("Video downloaded successfully, starting processing")
             
             # Get video metadata
             probe = ffmpeg.probe(temp_video)
@@ -112,15 +124,17 @@ class VideoExtractor:
                 'total_frames': int(duration * fps)
             }
             
-            print(f"📊 Video metadata: {duration:.1f}s, {fps:.1f} fps, {width}x{height}")
+            logger.info(f"Video metadata: {duration:.1f}s, {fps:.1f} fps, {width}x{height}")
             
             # Extract frames if timestamps provided
             frames = {}
-            timestamps = list(range(0, int(duration), int(2)))
+            # Get frame sampling interval from environment or default to 2 seconds
+            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "2"))
+            timestamps = list(range(0, int(duration), sampling_interval))
 
             if timestamps:
-                print(f"📸 Extracting {len(timestamps)} frames...")
-                
+                logger.info(f"Extracting {len(timestamps)} frames")
+
                 for i, timestamp in enumerate(timestamps):
                     try:
                         frame_data, _ = (
@@ -129,33 +143,34 @@ class VideoExtractor:
                             .output('pipe:', format='rawvideo', pix_fmt='bgr24', vframes=1, s=f'{width}x{height}')
                             .run(capture_stdout=True, quiet=True)
                         )
-                        
+
                         if frame_data:
                             frame_array = np.frombuffer(frame_data, np.uint8)
                             frame = frame_array.reshape((height, width, 3))
                             frames[timestamp] = frame
-                            
+
                             if (i + 1) % 10 == 0:
-                                print(f"📸 Extracted {i + 1}/{len(timestamps)} frames")
-                        
+                                logger.debug(f"Extracted {i + 1}/{len(timestamps)} frames")
+
                     except Exception as e:
-                        print(f"⚠️ Failed to extract frame at {timestamp}s: {e}")
+                        logger.warning(f"Failed to extract frame at {timestamp}s: {e}")
                         frames[timestamp] = None
-                
-                print(f"✅ Frame extraction completed: {len([f for f in frames.values() if f is not None])}/{len(timestamps)} successful")
+
+                successful_frames = len([f for f in frames.values() if f is not None])
+                logger.info(f"Frame extraction completed: {successful_frames}/{len(timestamps)} successful")
             
             # Extract audio
-            print("🎵 Extracting audio...")
+            logger.info("Extracting audio")
             audio_path = os.path.join(self.temp_dir, 'extracted_audio.wav')
-            
+
             stream = ffmpeg.input(temp_video)
             stream = ffmpeg.output(stream, audio_path,
                                  acodec='pcm_s16le',  # 16-bit PCM
                                  ar='16000',           # 16kHz sample rate
                                  ac='1')               # mono channel
-            
+
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
-            print(f"✅ Audio extracted to: {audio_path}")
+            logger.info(f"Audio extracted to: {audio_path}")
             
             # Clean up video file (keep audio file)
             if os.path.exists(temp_video):
@@ -168,17 +183,20 @@ class VideoExtractor:
             }
             
         except Exception as e:
-            print(f"❌ Error in video processing: {e}")
+            logger.error(f"Error in video processing: {e}", exc_info=True)
             raise Exception(f"Failed to process video: {str(e)}")
 
     def cleanup(self):
         """Clean up temporary directory and files"""
         if self.temp_dir and os.path.exists(self.temp_dir):
             import shutil
-            print(f"🧹 Cleaning up temporary directory: {self.temp_dir}")
-            shutil.rmtree(self.temp_dir, ignore_errors=True)
-            self.temp_dir = None
-            print("✅ Cleanup completed")
+            logger.info(f"Cleaning up temporary directory: {self.temp_dir}")
+            try:
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+                self.temp_dir = None
+                logger.info("Cleanup completed successfully")
+            except Exception as e:
+                logger.warning(f"Error during cleanup: {e}")
 
     def __del__(self):
         """Cleanup when object is destroyed"""

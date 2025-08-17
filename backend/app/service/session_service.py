@@ -124,6 +124,8 @@ async def process_video_background(session_uid: UUID, video_url: str):
         logger.info(f"Video processing completed for session {session_uid}")
         logger.info(f"Results: {results}")
 
+        return results
+
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing
 

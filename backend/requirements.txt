@@ -35,6 +35,8 @@ asyncio
 opencv-python
 numpy
 requests
+mediapipe
+scikit-image
 
 # Audio Processing
 ffmpeg-python
