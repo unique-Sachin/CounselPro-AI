@@ -103,7 +103,7 @@ class VideoProcessor:
             bool: True if a face is detected (camera is on), False otherwise.
         """
         # Load the pre-trained Haar Cascade for face detection
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml') # type: ignore
         
         if face_cascade.empty():
             print("Error loading face cascade XML file.")
@@ -193,6 +193,7 @@ class VideoProcessor:
             
             print(f"Audio extracted successfully to: {audio_path}")
             return audio_path
+          
             
         except Exception as e:
             print(f"Error extracting audio: {e}")
@@ -229,44 +230,44 @@ class VideoProcessor:
             print("Successfully downloaded private video using authenticated API")
 
             # Perform the analysis
-            cap = cv2.VideoCapture(video_path)
-            if not cap.isOpened():
-                raise Exception("Failed to open video file for analysis")
+            # cap = cv2.VideoCapture(video_path)
+            # if not cap.isOpened():
+            #     raise Exception("Failed to open video file for analysis")
                 
-            ret, first_frame = cap.read()
-            cap.release()
+            # ret, first_frame = cap.read()
+            # cap.release()
             
-            if not ret:
-                raise Exception("Failed to read video frames")
+            # if not ret:
+            #     raise Exception("Failed to read video frames")
             
-            # Analyze camera status
-            camera_on = self.analyze_camera_status(video_path)
+            # # Analyze camera status
+            # camera_on = self.analyze_camera_status(video_path)
             
-            # Analyze attire if camera is on
-            if camera_on:
-                attire_status = self.analyze_attire(first_frame)
-            else:
-                attire_status = "Not applicable (camera off)"
+            # # Analyze attire if camera is on
+            # if camera_on:
+            #     attire_status = self.analyze_attire(first_frame)
+            # else:
+            #     attire_status = "Not applicable (camera off)"
             
-            # Get video metadata
-            cap = cv2.VideoCapture(video_path)
-            fps = cap.get(cv2.CAP_PROP_FPS)
-            frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            duration = frame_count / fps if fps > 0 else 0
-            cap.release()
+            # # Get video metadata
+            # cap = cv2.VideoCapture(video_path)
+            # fps = cap.get(cv2.CAP_PROP_FPS)
+            # frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            # duration = frame_count / fps if fps > 0 else 0
+            # cap.release()
             
-            # Extract audio for Whisper processing
+            # Extract audio and transcribe it
             print("Extracting audio from video...")
             audio_path = self.extract_audio(video_path, temp_dir)
             
             # Construct the response
             results = {
-                "camera_status": "On" if camera_on else "Off",
-                "attire_status": attire_status,
-                "video_duration": round(duration, 2),
-                "frame_count": frame_count,
-                "fps": round(fps, 2),
-                "audio_path": audio_path
+                # "camera_status": "On" if camera_on else "Off",
+                # "attire_status": attire_status,
+                # "video_duration": round(duration, 2),
+                # "frame_count": frame_count,
+                # "fps": round(fps, 2),
+                "audio_path": audio_path,
             }
             
             return results
@@ -275,7 +276,7 @@ class VideoProcessor:
             print(f"An error occurred: {e}")
             raise e
             
-        finally:
-            # Cleanup: remove the temporary directory and its contents
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        # finally:
+        #     # Cleanup: remove the temporary directory and its contents
+        #     shutil.rmtree(temp_dir, ignore_errors=True)
 

@@ -26,10 +26,10 @@ async def create_counseling_session(
     # Create the session first
     session = await create_session(db, session_in)
 
+    await process_video_background(session.uid, str(session.recording_link)) # type: ignore
     # Add video processing as background task
-    background_tasks.add_task(
-        process_video_background, session.uid, str(session.recording_link)
-    )
+    # background_tasks.add_task(
+    # )
 
     return session
 

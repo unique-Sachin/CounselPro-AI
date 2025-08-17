@@ -64,7 +64,17 @@ export const listCounselors = async (params: PaginationParams = { skip: 0, limit
       skip: skip,
       limit: limit,
     } as PaginatedResponse<CounselorResponse>;
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number }; code?: string } | undefined;
+    const status = err?.response?.status as number | undefined;
+    const code = err?.code as string | undefined;
+    if (code === "ECONNABORTED" || status === 408) {
+      console.warn("Counselors request timed out");
+  } else if (!err?.response) {
+      console.warn("Network error while fetching counselors");
+    } else if (status === 405) {
+      console.warn("GET /counselors method not allowed on backend");
+    }
     console.error("Failed to fetch counselors:", error);
     // Return empty result structure for graceful UI handling
     return {

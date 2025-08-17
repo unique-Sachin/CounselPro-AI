@@ -1,0 +1,494 @@
+{
+  "metadata": {
+    "chunk_name": "ad1ef1c0-4861-4179-8360-8501c79ae50c",
+    "processing_time_seconds": 13.5,
+    "timestamp": "2025-08-17T19:57:54Z",
+    "role_mapping": {
+      "counselor": 0,
+      "student": 1
+    },
+    "total_speakers": 2
+  },
+  "utterances": [
+    {
+      "speaker": 0,
+      "text": "So,",
+      "start_time": "00:00:04.08",
+      "end_time": "00:00:04.80",
+      "confidence": 0.39,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I think that",
+      "start_time": "00:00:07.20",
+      "end_time": "00:00:08.56",
+      "confidence": 0.99,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "right now,",
+      "start_time": "00:00:09.20",
+      "end_time": "00:00:10.24",
+      "confidence": 0.88,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "after having seen that car accident,",
+      "start_time": "00:00:11.60",
+      "end_time": "00:00:13.91",
+      "confidence": 0.93,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "now the way that I feel just even when I'm in the car,",
+      "start_time": "00:00:16.47",
+      "end_time": "00:00:19.36",
+      "confidence": 0.93,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "that now I don't even really want to get in the car. I don't it's very stressful for me to even drive to work,",
+      "start_time": "00:00:21.84",
+      "end_time": "00:00:28.08",
+      "confidence": 0.95,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I mean it's my job. I have to get there.",
+      "start_time": "00:00:28.72",
+      "end_time": "00:00:31.04",
+      "confidence": 0.89,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "But I don't really drive any other place, and I live in a community where my grocery store is right down the street and my dry cleaner,",
+      "start_time": "00:00:32.16",
+      "end_time": "00:00:38.88",
+      "confidence": 0.94,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "but I don't drive to go see friends.",
+      "start_time": "00:00:39.60",
+      "end_time": "00:00:41.85",
+      "confidence": 0.97,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I'm just,",
+      "start_time": "00:00:43.77",
+      "end_time": "00:00:44.66",
+      "confidence": 0.86,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "you know, I'm just sort of paralyzed by this fear that even though I wasn't in that car accident Mhmm. That",
+      "start_time": "00:00:45.38",
+      "end_time": "00:00:51.61",
+      "confidence": 0.98,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "that I could that I could die in the car accident. This",
+      "start_time": "00:00:52.58",
+      "end_time": "00:00:56.40",
+      "confidence": 0.91,
+      "role": "counselor"
+    },
+    {
+      "speaker": 1,
+      "text": "is causing significant distress.",
+      "start_time": "00:00:56.56",
+      "end_time": "00:00:58.72",
+      "confidence": 0.93,
+      "role": "student"
+    },
+    {
+      "speaker": 0,
+      "text": "Yes. Yes.",
+      "start_time": "00:00:58.96",
+      "end_time": "00:01:00.16",
+      "confidence": 0.78,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I would definitely say it's significant.",
+      "start_time": "00:01:01.28",
+      "end_time": "00:01:03.36",
+      "confidence": 0.98,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "Yeah.",
+      "start_time": "00:01:03.52",
+      "end_time": "00:01:04.08",
+      "confidence": 0.8,
+      "role": "counselor"
+    },
+    {
+      "speaker": 1,
+      "text": "And affecting your behavior?",
+      "start_time": "00:01:05.68",
+      "end_time": "00:01:07.36",
+      "confidence": 0.82,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Yeah. Things you would normally do?",
+      "start_time": "00:01:07.76",
+      "end_time": "00:01:09.44",
+      "confidence": 0.86,
+      "role": "student"
+    },
+    {
+      "speaker": 0,
+      "text": "Yes. I don't I don't go anywhere other than to work. It's very it's very stressful for me to even get to work. I",
+      "start_time": "00:01:10.92",
+      "end_time": "00:01:18.05",
+      "confidence": 0.96,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "don't",
+      "start_time": "00:01:18.44",
+      "end_time": "00:01:19.01",
+      "confidence": 1.0,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "go and see my friends. If they come see me, that's fine, but I don't really wanna get in the car and drive anywhere,",
+      "start_time": "00:01:19.33",
+      "end_time": "00:01:24.77",
+      "confidence": 0.96,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "and I sure don't wanna get in the car with somebody else. Right.",
+      "start_time": "00:01:24.92",
+      "end_time": "00:01:28.00",
+      "confidence": 0.99,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "Okay. And",
+      "start_time": "00:01:28.72",
+      "end_time": "00:01:30.00",
+      "confidence": 0.96,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I've got this trip coming up.",
+      "start_time": "00:01:30.96",
+      "end_time": "00:01:32.88",
+      "confidence": 0.98,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "Yeah.",
+      "start_time": "00:01:33.12",
+      "end_time": "00:01:33.60",
+      "confidence": 0.97,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "My my family lives just a couple hours down the road, and I need to drive home.",
+      "start_time": "00:01:34.08",
+      "end_time": "00:01:38.80",
+      "confidence": 0.98,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I Can't catch a flight, but I'm not even sure that I'm gonna be able to go home for the holidays because I cannot imagine driving on the highway Okay. For two hours.",
+      "start_time": "00:01:39.84",
+      "end_time": "00:01:47.69",
+      "confidence": 0.97,
+      "role": "counselor"
+    },
+    {
+      "speaker": 1,
+      "text": "So, yeah, again, it's just significantly you've witnessed this dramatic event, which",
+      "start_time": "00:01:48.00",
+      "end_time": "00:01:52.64",
+      "confidence": 0.9,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "would rock a lot of people's world, and and it sounds like that's what it's happening right now. Mhmm.",
+      "start_time": "00:01:53.36",
+      "end_time": "00:01:59.15",
+      "confidence": 0.96,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "And so I guess,",
+      "start_time": "00:02:00.35",
+      "end_time": "00:02:01.47",
+      "confidence": 0.84,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "kind of at the halfway point, you know, of the",
+      "start_time": "00:02:02.11",
+      "end_time": "00:02:05.15",
+      "confidence": 0.92,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "of this session here, I'm wondering if maybe I can just summarize a little bit what I'm understanding.",
+      "start_time": "00:02:05.47",
+      "end_time": "00:02:10.40",
+      "confidence": 0.96,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "You say, you know, you're talking about feeling anxious. Okay. If I take a note or two. Oh, yeah. Sure. Talking about feeling this anxiety in different areas,",
+      "start_time": "00:02:10.47",
+      "end_time": "00:02:18.72",
+      "confidence": 0.89,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "of your life.",
+      "start_time": "00:02:19.28",
+      "end_time": "00:02:20.08",
+      "confidence": 0.99,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "You had mentioned that",
+      "start_time": "00:02:22.38",
+      "end_time": "00:02:23.66",
+      "confidence": 0.98,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "feeling of anxiety and the fact that it's limiting you,",
+      "start_time": "00:02:24.22",
+      "end_time": "00:02:26.70",
+      "confidence": 0.82,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "you're having some thoughts about,",
+      "start_time": "00:02:27.74",
+      "end_time": "00:02:29.26",
+      "confidence": 0.9,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Should I be over this by now?",
+      "start_time": "00:02:29.58",
+      "end_time": "00:02:31.34",
+      "confidence": 0.76,
+      "role": "student"
+    },
+    {
+      "speaker": 0,
+      "text": "And so forth. And I wasn't even in the accident, so why am I so affected by it? I should be over this by now. I shouldn't be",
+      "start_time": "00:02:31.82",
+      "end_time": "00:02:38.84",
+      "confidence": 0.93,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "so disrupted.",
+      "start_time": "00:02:39.16",
+      "end_time": "00:02:40.19",
+      "confidence": 0.85,
+      "role": "counselor"
+    },
+    {
+      "speaker": 1,
+      "text": "Disruptive. A lot of shoulds then. A lot of I should be better. Why",
+      "start_time": "00:02:40.59",
+      "end_time": "00:02:45.31",
+      "confidence": 0.87,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "is this happening to me?",
+      "start_time": "00:02:45.47",
+      "end_time": "00:02:46.75",
+      "confidence": 0.93,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Can't I handle it?",
+      "start_time": "00:02:47.16",
+      "end_time": "00:02:48.52",
+      "confidence": 0.91,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Okay. Why can't I handle this?",
+      "start_time": "00:02:48.92",
+      "end_time": "00:02:50.44",
+      "confidence": 0.95,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Yeah.",
+      "start_time": "00:02:51.06",
+      "end_time": "00:02:51.70",
+      "confidence": 0.98,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "Okay.",
+      "start_time": "00:02:52.42",
+      "end_time": "00:02:53.14",
+      "confidence": 0.97,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "And then as you mentioned, the behavior is that you're no longer doing some of the things that you enjoy, and even when you are driving to work or whatever, it's very problematic.",
+      "start_time": "00:02:54.74",
+      "end_time": "00:03:03.70",
+      "confidence": 0.98,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "It's anxiety provoking. You get to work and you're a wreck. Yeah. Yeah.",
+      "start_time": "00:03:03.94",
+      "end_time": "00:03:09.04",
+      "confidence": 0.86,
+      "role": "student"
+    },
+    {
+      "speaker": 0,
+      "text": "I am. I mean, it's like I was saying. I just I can feel my chest tightening up and my heart rate accelerates and my hands are like sweating",
+      "start_time": "00:03:10.97",
+      "end_time": "00:03:19.22",
+      "confidence": 0.93,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "as I'm holding on to the wheel and I can even hear the sound of like brakes squealing.",
+      "start_time": "00:03:19.46",
+      "end_time": "00:03:25.86",
+      "confidence": 0.91,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "They're not, but I can just hear it in my mind and that sound of",
+      "start_time": "00:03:25.86",
+      "end_time": "00:03:29.06",
+      "confidence": 0.96,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "cars running into each other and Yeah. My muscles feel so tight that they could pop and,",
+      "start_time": "00:03:29.62",
+      "end_time": "00:03:35.15",
+      "confidence": 0.94,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "you know, it's just even hard to swallow.",
+      "start_time": "00:03:35.54",
+      "end_time": "00:03:37.39",
+      "confidence": 0.99,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "I mean, it's it's just a struggle. Okay. Okay. So",
+      "start_time": "00:03:38.11",
+      "end_time": "00:03:42.03",
+      "confidence": 0.99,
+      "role": "counselor"
+    },
+    {
+      "speaker": 1,
+      "text": "if we can kinda see this as a little bit of a a a pattern, kind of a a cycle that's happening,",
+      "start_time": "00:03:42.84",
+      "end_time": "00:03:48.60",
+      "confidence": 0.94,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "not a pattern in your life, but kinda how it's working, it seems that,",
+      "start_time": "00:03:48.76",
+      "end_time": "00:03:52.12",
+      "confidence": 0.95,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "the anxiety, the fear, and so forth that you're feeling is causing you to, you know, to question",
+      "start_time": "00:03:53.32",
+      "end_time": "00:03:58.77",
+      "confidence": 0.99,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "yourself and your ability to be able to function, and you're starting to kind of wonder,",
+      "start_time": "00:03:59.09",
+      "end_time": "00:04:04.21",
+      "confidence": 0.97,
+      "role": "student"
+    },
+    {
+      "speaker": 1,
+      "text": "and and maybe have some thoughts that are not productive.",
+      "start_time": "00:04:04.44",
+      "end_time": "00:04:08.07",
+      "confidence": 0.98,
+      "role": "student"
+    },
+    {
+      "speaker": 0,
+      "text": "Yeah. Like, I feel, like, weak or Yeah.",
+      "start_time": "00:04:08.39",
+      "end_time": "00:04:11.43",
+      "confidence": 0.84,
+      "role": "counselor"
+    }
+  ]
+}
