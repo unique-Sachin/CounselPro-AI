@@ -8,20 +8,16 @@ from app.routes.session_route import router as session_router
 from contextlib import asynccontextmanager
 import uvicorn
 import time
+import uuid
 
 from app.exceptions.global_exception_handler import register_exception_handlers
+import traceback
+import logging
+from fastapi.middleware.cors import CORSMiddleware
+from app.config.log_config import get_logger
 
-# Configure logging
-# logger = logging.getLogger("api_logger")
-logger = logging.getLogger("uvicorn.error")
-logger.setLevel(logging.DEBUG)
-
-# Add console handler if not already added
-if not logger.handlers:
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+# Initialize logger
+logger = get_logger("CounselPro")
 
 
 @asynccontextmanager
@@ -58,32 +54,26 @@ app.add_middleware(
 )
 
 
-# @app.middleware("http")
-# async def log_requests(request: Request, call_next):
-#     start_time = time.time()
-#     try:
-#         response = await call_next(request)
-#         process_time = (time.time() - start_time) * 1000
-#         logger.info(
-#             f"➡️ {request.method} {request.url.path} "
-#             f"completed_in={process_time:.2f}ms "
-#             f"status_code={response.status_code}"
-#         )
-#         return response
-#     except Exception as e:
-#         logger.error(
-#             f"❌ Error while handling {request.method} {request.url.path}: "
-#             f"{str(e)}\n{''.join(traceback.format_tb(e.__traceback__))}"
-#         )
-#         raise
-
-
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    print(f"📥 Incoming request: {request.method} {request.url}")
-    response = await call_next(request)
-    print(f"📤 Response status: {response.status_code}")
-    return response
+    import time, uuid
+
+    request_id = str(uuid.uuid4())
+    start_time = time.time()
+    logger.info(
+        f"[{request_id}] 📥 Incoming request: {request.method} {request.url.path}"
+    )
+
+    try:
+        response = await call_next(request)
+        process_time = (time.time() - start_time) * 1000
+        logger.info(
+            f"[{request_id}] 📤 Response {response.status_code} completed_in={process_time:.2f}ms"
+        )
+        return response
+    except Exception as e:
+        logger.exception(f"[{request_id}] ❌ Error handling request: {str(e)}")
+        raise
 
 
 app.include_router(counselor_router)

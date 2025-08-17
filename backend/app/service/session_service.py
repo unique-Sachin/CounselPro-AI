@@ -16,8 +16,11 @@ from app.schemas.session_schema import (
     CounselorInfo,
 )
 from app.exceptions.custom_exception import BaseAppException, NotFoundException
+from app.config.log_config import get_logger
 
-logger = logging.getLogger(__name__)
+from app.config.log_config import get_logger
+
+logger = get_logger("session_service")
 
 
 async def create_session(
