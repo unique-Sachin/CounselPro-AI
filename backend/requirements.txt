@@ -38,6 +38,11 @@ python-dateutil
 # Async utilities
 asyncio
 
+celery
+flower
+redis
+
+
 # Video Processing
 opencv-python
 numpy
