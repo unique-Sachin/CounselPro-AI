@@ -48,3 +48,6 @@ ffmpeg-python
 google-api-python-client
 google-auth
 
+#Email Sending
+aiosmtplib
+
