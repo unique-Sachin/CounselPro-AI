@@ -44,13 +44,15 @@ export interface CounselorUpdate {
 }
 
 // Session types
-export interface SessionResponse extends BaseModel {
+export interface SessionResponse {
   uid: string;
   description: string;
   session_date: string;
   recording_link: string;
-  counselor_id?: number;
-  counselor?: CounselorResponse;
+  counselor: {
+    uid: string;
+    name: string;
+  };
 }
 
 export interface SessionCreate {

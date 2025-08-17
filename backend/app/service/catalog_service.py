@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from fastapi import UploadFile, HTTPException
 
-from models.catalog_file import CatalogFile
-from service.course_verification.catalog_indexer import CourseCatalogIndexer
+from app.models.catalog_file import CatalogFile
+from app.service.course_verification.catalog_indexer import CourseCatalogIndexer
 
 logger = logging.getLogger(__name__)
 

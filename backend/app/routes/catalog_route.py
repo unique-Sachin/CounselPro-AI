@@ -3,9 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from uuid import UUID
 
-from db.database import get_async_db
-from schemas.catalog_schema import CatalogFileResponse
-from service.catalog_service import (
+from app.db.database import get_async_db
+from app.schemas.catalog_schema import CatalogFileResponse
+from app.service.catalog_service import (
     save_uploaded_file,
     get_all_files,
     index_catalog_files,

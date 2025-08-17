@@ -1,9 +1,9 @@
 import logging
 from uuid import UUID
 from app.service.video_processing.video_processing import VideoProcessor
-from service.video_processing.video_processing import VideoProcessor
-from service.audio_processing.deepgram_transcriber import DeepgramTranscriber
-from service.course_verification.course_verifier import CourseVerifier
+# from service.video_processing.video_processing import VideoProcessor
+from app.service.audio_processing.deepgram_transcriber import DeepgramTranscriber
+from app.service.course_verification.course_verifier import CourseVerifier
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -87,7 +87,7 @@ async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionRespo
             session_date=session.session_date,
             recording_link=session.recording_link,
             counselor=CounselorInfo(
-                uid=session.counselor.uid, name=session.counselor.name
+                uid=str(session.counselor.uid), name=session.counselor.name
             ),
         )
     except SQLAlchemyError as e:

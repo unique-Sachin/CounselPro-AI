@@ -8,23 +8,18 @@ import {
 } from "@/lib/types";
 
 // List sessions with pagination
-// Note: Backend doesn't currently have GET /sessions endpoint, returning empty data
 export const listSessions = async (params: PaginationParams = { skip: 0, limit: 10 }) => {
-  // Since the backend doesn't have a general list sessions endpoint (only by-counselor),
-  // we return empty data structure for now
-  console.info("Sessions list endpoint not available on backend, returning empty data");
-  return {
-    items: [],
-    total: 0,
-    skip: params.skip || 0,
-    limit: params.limit || 10,
-  } as PaginatedResponse<SessionResponse>;
-  
-  /* 
-  // Uncomment this when backend implements GET /sessions endpoint
   try {
-    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>("/sessions", params as Record<string, unknown>);
-    return response.data;
+    const response = await apiHelpers.get<SessionResponse[]>("/sessions/all", params as Record<string, unknown>);
+    const sessions = response.data;
+    
+    // Transform the array response into paginated format
+    return {
+      items: sessions,
+      total: sessions.length,
+      skip: params.skip || 0,
+      limit: params.limit || 10,
+    } as PaginatedResponse<SessionResponse>;
   } catch (error) {
     console.error("Failed to fetch sessions:", error);
     // Return empty result structure for graceful UI handling
@@ -35,7 +30,6 @@ export const listSessions = async (params: PaginationParams = { skip: 0, limit: 
       limit: params.limit || 10,
     } as PaginatedResponse<SessionResponse>;
   }
-  */
 };
 
 // Create a new session

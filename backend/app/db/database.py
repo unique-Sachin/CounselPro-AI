@@ -45,9 +45,9 @@ async def get_async_db():
 # Create database tables
 async def create_tables():
     # Import all models to ensure they're registered
-    from models.counselor import Counselor  # type: ignore
-    from models.session import CounselingSession  # type: ignore  
-    from models.catalog_file import CatalogFile  # type: ignore
+    from app.models.counselor import Counselor  # type: ignore
+    from app.models.session import CounselingSession  # type: ignore  
+    from app.models.catalog_file import CatalogFile  # type: ignore
     
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

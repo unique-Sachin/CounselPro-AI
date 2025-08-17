@@ -36,7 +36,10 @@ export default function SessionsPage() {
   // Client-side filtering
   const filteredSessions = sessionsData?.items?.filter((session) => {
     const searchLower = searchQuery.toLowerCase();
-    return session.description.toLowerCase().includes(searchLower);
+    return (
+      session.description.toLowerCase().includes(searchLower) ||
+      session.counselor?.name?.toLowerCase().includes(searchLower)
+    );
   }) || [];
 
   const totalPages = sessionsData ? Math.ceil(sessionsData.total / ITEMS_PER_PAGE) : 0;
@@ -74,7 +77,7 @@ export default function SessionsPage() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search sessions..."
+              placeholder="Search sessions or counselors..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8"
@@ -145,9 +148,15 @@ export default function SessionsPage() {
                       <p className="font-medium line-clamp-1">
                         {session.description}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {session.session_date ? new Date(session.session_date).toLocaleDateString() : 'Date not set'}
-                      </p>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>
+                          {session.session_date ? new Date(session.session_date).toLocaleDateString() : 'Date not set'}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Counselor: {session.counselor?.name || 'Unknown'}
+                        </span>
+                      </div>
                     </div>
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/sessions/${session.uid}`}>
