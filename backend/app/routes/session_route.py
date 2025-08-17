@@ -1,4 +1,6 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
+from app.models.video_analysis import VideoAnalysisResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -88,3 +90,11 @@ async def delete_counseling_session(
     session_uid: str, db: AsyncSession = Depends(get_async_db)
 ):
     return await delete_session(db, session_uid)
+
+
+@router.get("/{session_id}/analysis", response_model=VideoAnalysisResponse)
+async def get_session_analysis(
+    session_id: UUID, video_url: str, db: AsyncSession = Depends(get_async_db)
+):
+    results = await process_video_background(session_id, video_url)
+    return VideoAnalysisResponse(**results)

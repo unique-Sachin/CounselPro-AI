@@ -314,6 +314,8 @@ async def process_video_background(session_uid: UUID, video_url: str):
                 print(f"Warning: Course verification failed: {verification_error}")
                 results["verification_error"] = str(verification_error)
 
+        return results
+
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing
 

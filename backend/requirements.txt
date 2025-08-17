@@ -47,6 +47,8 @@ redis
 opencv-python
 numpy
 requests
+mediapipe
+scikit-image
 
 # Audio Processing
 ffmpeg-python
@@ -54,6 +56,7 @@ ffmpeg-python
 # Google API Dependencies
 google-api-python-client
 google-auth
+google-generativeai
 
 #Email Sending
 aiosmtplib
