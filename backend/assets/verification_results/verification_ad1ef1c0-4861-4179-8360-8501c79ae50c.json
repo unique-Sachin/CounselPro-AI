@@ -1,0 +1,11 @@
+{
+  "courses_mentioned": [],
+  "overall_summary": "No courses, programs, or educational offerings were mentioned in the transcript excerpt. Therefore, no verification was necessary.",
+  "accuracy_score": 1.0,
+  "red_flags": [],
+  "session_metadata": {
+    "session_id": null,
+    "total_utterances": 60,
+    "counselor_utterances": 33
+  }
+}

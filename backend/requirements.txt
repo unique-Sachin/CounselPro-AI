@@ -10,8 +10,15 @@ psycopg2-binary
 
 # AI & LangChain
 langchain
+langchain-community
 langchain-google-genai
 langchain-pinecone
+langchain-openai
+langchain-core
+pinecone
+pypdf
+python-docx
+docx2txt
 
 
 # Data & Validation
@@ -31,6 +38,11 @@ python-dateutil
 # Async utilities
 asyncio
 
+celery
+flower
+redis
+
+
 # Video Processing
 opencv-python
 numpy
@@ -45,4 +57,7 @@ ffmpeg-python
 google-api-python-client
 google-auth
 google-generativeai
+
+#Email Sending
+aiosmtplib
 

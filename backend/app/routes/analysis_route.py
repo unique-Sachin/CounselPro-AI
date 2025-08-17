@@ -31,12 +31,7 @@ async def create_counselor_route(
 async def get_counselor_route(
     counselor_id: str, db: AsyncSession = Depends(get_async_db)
 ):
-    from uuid import UUID
-    try:
-        counselor_uid = UUID(counselor_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid UUID format for counselor_id")
-    return await get_counselor(db, counselor_uid)
+    return await get_counselor(db, counselor_id)
 
 
 @router.put("/{counselor_id}", response_model=CounselorResponse)
@@ -45,12 +40,7 @@ async def update_counselor_route(
     updates: CounselorUpdate,
     db: AsyncSession = Depends(get_async_db),
 ):
-    from uuid import UUID
-    try:
-        counselor_uid = UUID(counselor_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid UUID format for counselor_id")
-    return await update_counselor(db, counselor_uid, updates)
+    return await update_counselor(db, counselor_id, updates)
 
 
 @router.delete("/{counselor_id}", status_code=204)
@@ -58,11 +48,6 @@ async def delete_counselor_route(
     counselor_uid: str,
     db: AsyncSession = Depends(get_async_db),
 ):
-    from uuid import UUID
-    try:
-        counselor_uid = UUID(counselor_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid UUID format for counselor_id")
     await delete_counselor(db, counselor_uid)
 
 

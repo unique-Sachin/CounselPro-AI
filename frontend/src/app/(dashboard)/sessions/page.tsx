@@ -10,8 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-import { listSessions } from "@/lib/services/sessions";
+import { listSessions, listSessionsByCounselor, getCounselors } from "@/lib/services/sessions";
 import Link from "next/link";
 
 const ITEMS_PER_PAGE = 10;
@@ -19,24 +26,42 @@ const ITEMS_PER_PAGE = 10;
 export default function SessionsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCounselor, setSelectedCounselor] = useState<string>("all");
 
   const skip = (currentPage - 1) * ITEMS_PER_PAGE;
 
-  // Fetch sessions with React Query
+  // Fetch counselors for the filter dropdown
+  const {
+    data: counselors,
+  } = useQuery({
+    queryKey: ["counselors"],
+    queryFn: getCounselors,
+    staleTime: 300000, // 5 minutes
+  });
+
+  // Fetch sessions with React Query - either all sessions or by counselor
   const {
     data: sessionsData,
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["sessions", skip, ITEMS_PER_PAGE],
-    queryFn: () => listSessions({ skip, limit: ITEMS_PER_PAGE }),
+    queryKey: ["sessions", skip, ITEMS_PER_PAGE, selectedCounselor],
+    queryFn: () => {
+      if (selectedCounselor && selectedCounselor !== "all") {
+        return listSessionsByCounselor(selectedCounselor, { skip, limit: ITEMS_PER_PAGE });
+      }
+      return listSessions({ skip, limit: ITEMS_PER_PAGE });
+    },
     staleTime: 30000, // 30 seconds
   });
 
   // Client-side filtering
   const filteredSessions = sessionsData?.items?.filter((session) => {
     const searchLower = searchQuery.toLowerCase();
-    return session.description.toLowerCase().includes(searchLower);
+    return (
+      session.description.toLowerCase().includes(searchLower) ||
+      session.counselor?.name?.toLowerCase().includes(searchLower)
+    );
   }) || [];
 
   const totalPages = sessionsData ? Math.ceil(sessionsData.total / ITEMS_PER_PAGE) : 0;
@@ -47,6 +72,11 @@ export default function SessionsPage() {
 
   const handleNextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  const handleCounselorChange = (value: string) => {
+    setSelectedCounselor(value);
+    setCurrentPage(1); // Reset to first page when filter changes
   };
 
   return (
@@ -69,23 +99,42 @@ export default function SessionsPage() {
           </Button>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center space-x-2">
+        {/* Search and Filters */}
+        <div className="flex items-center space-x-4">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search sessions..."
+              placeholder="Search sessions or counselors..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-8"
             />
           </div>
+          
+          <Select value={selectedCounselor} onValueChange={handleCounselorChange}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="All counselors" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All counselors</SelectItem>
+              {counselors?.map((counselor) => (
+                <SelectItem key={counselor.uid} value={counselor.uid}>
+                  {counselor.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Sessions List */}
         <Card>
           <CardHeader>
-            <CardTitle>All Sessions</CardTitle>
+            <CardTitle>
+              {selectedCounselor && selectedCounselor !== "all"
+                ? `Sessions by ${counselors?.find(c => c.uid === selectedCounselor)?.name || 'Selected Counselor'}`
+                : 'All Sessions'
+              }
+            </CardTitle>
             <CardDescription>
               {isLoading 
                 ? "Loading sessions..." 
@@ -145,9 +194,15 @@ export default function SessionsPage() {
                       <p className="font-medium line-clamp-1">
                         {session.description}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {session.session_date ? new Date(session.session_date).toLocaleDateString() : 'Date not set'}
-                      </p>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>
+                          {session.session_date ? new Date(session.session_date).toLocaleDateString() : 'Date not set'}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          Counselor: {session.counselor?.name || 'Unknown'}
+                        </span>
+                      </div>
                     </div>
                     <Button variant="outline" size="sm" asChild>
                       <Link href={`/sessions/${session.uid}`}>

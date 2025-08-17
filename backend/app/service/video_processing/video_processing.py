@@ -162,6 +162,7 @@ class VideoProcessor:
                         "height": metadata['height']
                     }
                 },
+                "audio_path" : audio_path,
     
                 # Camera analysis results
                 "camera_analysis": {
