@@ -9,8 +9,8 @@ from app.db.database import Base
 class CounselingSession(Base):
     __tablename__ = "counseling_sessions"
 
-    id = Column(Integer, primary_key=True, index=True)
-    uid = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
+    id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
+    uid = Column(UUID(as_uuid=False), default=uuid.uuid4, unique=True, nullable=False)
     counselor_id = Column(
         Integer, ForeignKey("counselors.id", ondelete="CASCADE"), nullable=False
     )
@@ -20,3 +20,6 @@ class CounselingSession(Base):
 
     counselor = relationship("Counselor", back_populates="sessions")
     analysis = relationship("SessionAnalysis", back_populates="session", uselist=False)
+    raw_transcript = relationship(
+        "RawTranscript", back_populates="session", uselist=False
+    )

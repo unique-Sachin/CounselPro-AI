@@ -7,6 +7,7 @@ from app.routes.counselor_route import router as counselor_router
 from app.routes.session_route import router as session_router
 from app.routes.catalog_route import router as catalog_router
 from app.routes.session_analysis_route import router as session_analysis_router
+from app.routes.raw_transcript_route import router as raw_transcript_router
 from contextlib import asynccontextmanager
 import uvicorn
 import time
@@ -83,6 +84,7 @@ app.include_router(counselor_router)
 app.include_router(session_router)
 app.include_router(catalog_router)
 app.include_router(session_analysis_router)
+app.include_router(raw_transcript_router)
 
 
 @app.get("/", tags=["Health Check"])
@@ -90,7 +92,7 @@ async def root():
     return {"message": "AI-Powered Counselor Excellence System"}
 
 
-@app.post("/email/test")
+@app.post("/email/test", tags=["Test Email"])
 async def test_email(email: str):
     """
     Test endpoint to verify email functionality

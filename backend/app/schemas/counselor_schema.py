@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional
-from uuid import UUID
+from typing import List
 
 
 # Schema for creating a new counselor
@@ -23,7 +23,7 @@ class CounselorUpdate(BaseModel):
 
 # Schema for reading counselor data (without internal integer id)
 class CounselorResponse(BaseModel):
-    uid: UUID
+    uid: str
     name: str
     employee_id: str
     dept: str
@@ -31,3 +31,10 @@ class CounselorResponse(BaseModel):
     mobile_number: str
 
     model_config = {"from_attributes": True}
+
+
+class CounselorListResponse(BaseModel):
+    items: List[CounselorResponse]
+    total: int
+    skip: int
+    limit: int
