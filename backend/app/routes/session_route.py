@@ -32,13 +32,6 @@ async def create_counseling_session(
 ):
     # Create the session first
     session = await create_session(db, session_in)
-
-    # Add video processing as background task
-    # background_tasks.add_task(
-    #     process_video_background, session.uid, str(session.recording_link), db
-    # )
-    await process_video_background(session.uid, str(session.recording_link), db)  # type: ignore
-
     return session
 
 
@@ -62,7 +55,7 @@ async def list_all_sessions(
 
 @router.get("/{session_uid}", response_model=SessionResponse)
 async def get_counseling_session(
-    session_uid: str, db: AsyncSession = Depends(get_async_db)
+    session_uid: UUID, db: AsyncSession = Depends(get_async_db)
 ):
     return await get_session_by_id(db, session_uid)
 
@@ -103,7 +96,7 @@ async def delete_counseling_session(
 
 @router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
 async def get_session_analysis(
-    session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
+    session_id: UUID, db: AsyncSession = Depends(get_async_db)
 ):
-    results = await process_video_background(session_uid, video_url, db)
+    results = await process_video_background(db, session_id)
     return VideoAnalysisResponse(**results)

@@ -8,6 +8,7 @@ from app.service.audio_processing.deepgram_transcriber import DeepgramTranscribe
 from app.service.course_verification.course_verifier import CourseVerifier
 from app.service.raw_transcript_service import create_raw_transcript
 from app.schemas.raw_transcript_schema import RawTranscriptCreate
+from app.service.video_processing.video_extraction import VideoExtractor
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -73,7 +74,7 @@ async def create_session(
         )
 
 
-async def get_session_by_id(db: AsyncSession, session_uid: str) -> SessionResponse:
+async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionResponse:
     try:
         result = await db.execute(
             select(CounselingSession)
@@ -254,21 +255,23 @@ async def delete_session(db: AsyncSession, session_uid: str):
         )
 
 
-async def process_video_background(session_uid: str, video_url: str, db: AsyncSession):
+async def process_video_background(db: AsyncSession, session_uid: UUID):
     """
     Background task to process video for a counseling session.
     This function runs asynchronously after session creation.
     """
     try:
         print(f"Starting video processing for session {session_uid}")
+        sessionResponse = await get_session_by_id(db, session_uid)
+
+        extraction = VideoExtractor()
+        extraction_data = extraction.get_video_frames_and_audio_paths(str(sessionResponse.recording_link))
 
         # Initialize video processor
         video_processor = VideoProcessor()
+        results = await video_processor.analyze_video(extraction_data)
 
-        # Process the video
-        results = await video_processor.analyze_video(video_url)
-
-        audio_path = results.get("audio_path")
+        audio_path = extraction_data.get("audio_path")
         transcript_data = None
         
         # If transcription wasn't already done in video processing, do it here
@@ -276,14 +279,14 @@ async def process_video_background(session_uid: str, video_url: str, db: AsyncSe
             try:
                 print(f"Starting Deepgram transcription for audio: {audio_path}")
                 transcriber = DeepgramTranscriber()
-                transcript_data = transcriber.transcribe_chunk(audio_path, session_uid)
+                transcript_data = transcriber.transcribe_chunk(audio_path, str(session_uid))
                 print(f"Transcription completed successfully")
                 
                 # Save transcript to database
                 try:
                     total_segments = len(transcript_data.get("utterances", []))
                     transcript_create = RawTranscriptCreate(
-                        session_uid=session_uid,
+                        session_uid=str(session_uid),
                         total_segments=total_segments,
                         raw_transcript=transcript_data
                     )
@@ -302,7 +305,6 @@ async def process_video_background(session_uid: str, video_url: str, db: AsyncSe
                 results["transcription_error"] = str(transcription_error)
 
         print(f"Video processing completed for session {session_uid}")
-        print(f"Results: {results}")
 
         # Verify course information if transcription was successful
         if transcript_data:
@@ -360,3 +362,8 @@ async def process_video_background(session_uid: str, video_url: str, db: AsyncSe
             details=str(e),
             status_code=500,
         )
+    finally:
+            try:
+                extraction.cleanup()
+            except Exception as cleanup_error:
+                logger.warning(f"Error during cleanup: {cleanup_error}")
