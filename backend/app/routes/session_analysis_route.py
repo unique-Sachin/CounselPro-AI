@@ -20,7 +20,7 @@ from app.exceptions.custom_exception import (
 )
 from uuid import UUID
 
-router = APIRouter(prefix="/session-analysis", tags=["session-analysis"])
+router = APIRouter(prefix="/session-analysis", tags=["Session Analysis"])
 
 
 @router.post("/", response_model=SessionAnalysisResponse)
@@ -31,7 +31,7 @@ async def create_session_analysis(
 
 
 @router.get("/{uid}", response_model=SessionAnalysisResponse)
-async def get_session_analysis(uid: UUID, db: AsyncSession = Depends(get_async_db)):
+async def get_session_analysis(uid: str, db: AsyncSession = Depends(get_async_db)):
     analysis = await get_analysis_by_uid(db, uid)
     if not analysis:
         raise NotFoundException(details="Session analysis not found")
@@ -40,7 +40,7 @@ async def get_session_analysis(uid: UUID, db: AsyncSession = Depends(get_async_d
 
 @router.get("/by-session/{session_uid}", response_model=SessionAnalysisResponse)
 async def get_analysis_by_session(
-    session_uid: UUID, db: AsyncSession = Depends(get_async_db)
+    session_uid: str, db: AsyncSession = Depends(get_async_db)
 ):
     analysis = await get_analysis_by_session_uid(db, session_uid)
     if not analysis:
@@ -50,7 +50,7 @@ async def get_analysis_by_session(
 
 @router.put("/{uid}", response_model=SessionAnalysisResponse)
 async def update_session_analysis(
-    uid: UUID,
+    uid: str,
     session_analysis: SessionAnalysisCreate,
     db: AsyncSession = Depends(get_async_db),
 ):
@@ -61,7 +61,7 @@ async def update_session_analysis(
 
 
 @router.delete("/{uid}")
-async def delete_session_analysis(uid: UUID, db: AsyncSession = Depends(get_async_db)):
+async def delete_session_analysis(uid: str, db: AsyncSession = Depends(get_async_db)):
     success = await delete_analysis(db, uid)
     if not success:
         raise NotFoundException(details="Session analysis not found")

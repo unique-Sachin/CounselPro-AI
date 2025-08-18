@@ -10,7 +10,7 @@ class Counselor(Base):
     __tablename__ = "counselors"
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
-    uid = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
+    uid = Column(UUID(as_uuid=False), default=uuid.uuid4, unique=True, nullable=False)
     name = Column(String, nullable=False)
     employee_id = Column(String, unique=True, nullable=False)
     dept = Column(String, nullable=False)

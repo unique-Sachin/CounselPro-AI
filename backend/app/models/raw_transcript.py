@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
@@ -6,8 +6,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.db.database import Base
 
 
-class SessionAnalysis(Base):
-    __tablename__ = "session_analysis"
+class RawTranscript(Base):
+    __tablename__ = "raw_transcripts"
 
     id = Column(Integer, primary_key=True, autoincrement=True, nullable=False)
     uid = Column(UUID(as_uuid=False), default=uuid.uuid4, unique=True, nullable=False)
@@ -17,12 +17,12 @@ class SessionAnalysis(Base):
         unique=True,
         nullable=False,
     )
-    video_analysis_data = Column(JSON)  # Using JSON type for structured data
-    audio_analysis_data = Column(JSON)  # Using JSON type for structured data
+    total_segments = Column(Integer, nullable=False)
+    raw_transcript = Column(JSON, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # One-to-one relationship with CounselingSession
     session = relationship(
-        "CounselingSession", uselist=False, back_populates="analysis"
+        "CounselingSession", uselist=False, back_populates="raw_transcript"
     )

@@ -1,6 +1,8 @@
 import logging
 from uuid import UUID
 from app.service.video_processing.video_processing import VideoProcessor
+
+# from service.video_processing.video_processing import VideoProcessor
 from app.service.audio_processing.deepgram_transcriber import DeepgramTranscriber
 from app.service.course_verification.course_verifier import CourseVerifier
 from app.service.video_processing.video_extraction import VideoExtractor
@@ -57,12 +59,11 @@ async def create_session(
             description=new_session.description,
             session_date=new_session.session_date,
             recording_link=new_session.recording_link,
-            counselor=CounselorInfo(uid=counselor.uid, name=counselor.name),
+            counselor=CounselorInfo(uid=str(counselor.uid), name=counselor.name),
         )
 
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Database error during session creation: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -70,7 +71,7 @@ async def create_session(
         )
 
 
-async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionResponse:
+async def get_session_by_id(db: AsyncSession, session_uid: str) -> SessionResponse:
     try:
         result = await db.execute(
             select(CounselingSession)
@@ -91,12 +92,12 @@ async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionRespo
             ),
         )
     except SQLAlchemyError as e:
-        logger.error(f"Database error fetching session {session_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
             status_code=500,
         )
+
 
 async def get_sessions_by_counselor(
     db: AsyncSession, counselor_uid: str, skip: int = 0, limit: int = 10
@@ -111,7 +112,15 @@ async def get_sessions_by_counselor(
         if not counselor:
             raise NotFoundException(details=f"Counselor {counselor_uid} not found")
 
-        # Then get sessions using the counselor's ID
+        # Get total count of sessions for this counselor
+        total_result = await db.execute(
+            select(CounselingSession).filter(
+                CounselingSession.counselor_id == counselor.id
+            )
+        )
+        total = len(total_result.scalars().all())
+
+        # Fetch paginated sessions
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
@@ -122,23 +131,23 @@ async def get_sessions_by_counselor(
         sessions = result.scalars().all()
 
         # Format the response
-        return [
+        items = [
             SessionResponse(
                 uid=session.uid,
                 description=session.description,
                 session_date=session.session_date,
                 recording_link=session.recording_link,
                 counselor=CounselorInfo(
-                    uid=str(session.counselor.uid), name=session.counselor.name
+                    uid=session.counselor.uid,
+                    name=session.counselor.name,
                 ),
             )
             for session in sessions
         ]
 
+        return items, total
+
     except SQLAlchemyError as e:
-        logger.error(
-            f"Database error fetching sessions for counselor {counselor_uid}: {e}"
-        )
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -148,7 +157,11 @@ async def get_sessions_by_counselor(
 
 async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
     try:
-        # Fetch all sessions with their counselors
+        # Get total count
+        total_result = await db.execute(select(CounselingSession))
+        total = len(total_result.scalars().all())
+
+        # Fetch paginated sessions with their counselors
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
@@ -158,22 +171,22 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
         sessions = result.scalars().all()
 
         # Format the response
-        return [
+        items = [
             SessionResponse(
                 uid=session.uid,
                 description=session.description,
                 session_date=session.session_date,
                 recording_link=session.recording_link,
                 counselor=CounselorInfo(
-                    uid=str(session.counselor.uid),
+                    uid=session.counselor.uid,
                     name=session.counselor.name,
                 ),
             )
             for session in sessions
         ]
+        return items, total
 
     except SQLAlchemyError as e:
-        logger.error(f"Database error fetching all sessions: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -182,7 +195,7 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
 
 
 async def update_session(
-    db: AsyncSession, session_uid: UUID, session_in: SessionUpdate
+    db: AsyncSession, session_uid: str, session_in: SessionUpdate
 ) -> SessionResponse:
     # Get session with counselor eagerly loaded
     result = await db.execute(
@@ -217,7 +230,6 @@ async def update_session(
 
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Database error during session update {session_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -225,7 +237,7 @@ async def update_session(
         )
 
 
-async def delete_session(db: AsyncSession, session_uid: UUID):
+async def delete_session(db: AsyncSession, session_uid: str):
     session = await get_session_by_id(db, session_uid)
     try:
         await db.delete(session)
@@ -233,7 +245,6 @@ async def delete_session(db: AsyncSession, session_uid: UUID):
         return {"message": "Session deleted successfully"}
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Database error during session deletion {session_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -263,54 +274,59 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
             try:
                 print(f"Starting Deepgram transcription for audio: {audio_path}")
                 transcriber = DeepgramTranscriber()
-                transcript_path = transcriber.transcribe_chunk(audio_path, str(session_uid))
+                transcript_path = transcriber.transcribe_chunk(audio_path, session_uid)
                 print(f"Transcription completed: {transcript_path}")
                 # Add transcript path to results
                 results["transcript_path"] = transcript_path
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
                 results["transcription_error"] = str(transcription_error)
-            
-        
+
         print(f"Video processing completed for session {session_uid}")
 
         # Verify course information if transcription was successful
         if results.get("transcript_path"):
             try:
                 print(f"Starting course verification for session {session_uid}")
-                
+
                 # Load transcript data
                 import json
-                with open(results["transcript_path"], 'r', encoding='utf-8') as f:
+
+                with open(results["transcript_path"], "r", encoding="utf-8") as f:
                     transcript_data = json.load(f)
-                
+
                 # Initialize course verifier
                 verifier = CourseVerifier()
-                
+
                 # Verify course information
                 verification_result = verifier.verify_full_transcript(transcript_data)
-                
+
                 # Save verification results
                 from pathlib import Path
+
                 verification_dir = Path("assets/verification_results")
                 verification_dir.mkdir(parents=True, exist_ok=True)
-                
-                verification_file = verification_dir / f"verification_{session_uid}.json"
-                with open(verification_file, 'w', encoding='utf-8') as f:
+
+                verification_file = (
+                    verification_dir / f"verification_{session_uid}.json"
+                )
+                with open(verification_file, "w", encoding="utf-8") as f:
                     json.dump(verification_result, f, indent=2, ensure_ascii=False)
-                
+
                 results["verification_path"] = str(verification_file)
                 results["accuracy_score"] = str(verification_result["accuracy_score"])
                 results["red_flags_count"] = str(len(verification_result["red_flags"]))
-                
+
                 print(f"Course verification completed: {verification_file}")
                 print(f"Accuracy score: {verification_result['accuracy_score']:.2f}")
-                
+
                 if verification_result["red_flags"]:
-                    print(f"⚠️  {len(verification_result['red_flags'])} red flags detected:")
+                    print(
+                        f"⚠️  {len(verification_result['red_flags'])} red flags detected:"
+                    )
                     for flag in verification_result["red_flags"]:
                         print(f"   • {flag}")
-                
+
             except Exception as verification_error:
                 print(f"Warning: Course verification failed: {verification_error}")
                 results["verification_error"] = str(verification_error)

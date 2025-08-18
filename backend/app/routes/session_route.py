@@ -5,7 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.db.database import get_async_db
-from app.schemas.session_schema import SessionCreate, SessionUpdate, SessionResponse
+from app.schemas.session_schema import (
+    SessionCreate,
+    SessionUpdate,
+    SessionResponse,
+    SessionListResponse,
+)
 from app.service.session_service import (
     create_session,
     get_session_by_id,
@@ -30,7 +35,7 @@ async def create_counseling_session(
     return session
 
 
-@router.get("/all", response_model=List[SessionResponse])
+@router.get("/all", response_model=SessionListResponse)
 async def list_all_sessions(
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
@@ -39,7 +44,13 @@ async def list_all_sessions(
     """
     Get all counseling sessions, paginated
     """
-    return await get_all_sessions(db, skip=skip, limit=limit)
+    items, total = await get_all_sessions(db, skip=skip, limit=limit)
+    return {
+        "items": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
 
 
 @router.get("/{session_uid}", response_model=SessionResponse)
@@ -49,25 +60,22 @@ async def get_counseling_session(
     return await get_session_by_id(db, session_uid)
 
 
-# @router.get("/", response_model=List[SessionResponse])
-# async def list_counseling_sessions(
-#     skip: int = Query(0, ge=0),
-#     limit: int = Query(10, ge=1, le=100),
-#     db: AsyncSession = Depends(get_async_db),
-# ):
-#     return await get_all_sessions(db, skip=skip, limit=limit)
-
-
-@router.get("/by-counselor/{counselor_uid}", response_model=List[SessionResponse])
+@router.get("/by-counselor/{counselor_uid}", response_model=SessionListResponse)
 async def list_sessions_by_counselor(
     counselor_uid: str,
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_async_db),
 ):
-    return await get_sessions_by_counselor(
+    items, total = await get_sessions_by_counselor(
         db, counselor_uid=counselor_uid, skip=skip, limit=limit
     )
+    return {
+        "items": items,
+        "total": total,
+        "skip": 0,
+        "limit": 1,
+    }
 
 
 @router.put("/{session_uid}", response_model=SessionResponse)
@@ -86,7 +94,7 @@ async def delete_counseling_session(
     return await delete_session(db, session_uid)
 
 
-@router.get("/{session_id}/analysis", response_model=VideoAnalysisResponse)
+@router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
 async def get_session_analysis(
     session_id: UUID, db: AsyncSession = Depends(get_async_db)
 ):

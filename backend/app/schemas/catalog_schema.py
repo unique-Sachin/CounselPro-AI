@@ -5,7 +5,7 @@ from typing import Optional
 
 
 class CatalogFileResponse(BaseModel):
-    uid: UUID
+    uid: str
     filename: str
     uploaded_at: datetime
     status: str

@@ -18,8 +18,10 @@ router = APIRouter(prefix="/catalog", tags=["Catalog Management"])
 
 @router.post("/upload", response_model=CatalogFileResponse)
 async def upload_catalog(
-    file: UploadFile = File(..., description="Course catalog file (PDF, DOCX, TXT, MD)"),
-    db: AsyncSession = Depends(get_async_db)
+    file: UploadFile = File(
+        ..., description="Course catalog file (PDF, DOCX, TXT, MD)"
+    ),
+    db: AsyncSession = Depends(get_async_db),
 ):
     catalog_file = await save_uploaded_file(db, file)
     return CatalogFileResponse(
@@ -28,7 +30,7 @@ async def upload_catalog(
         uploaded_at=getattr(catalog_file, "uploaded_at"),
         status=getattr(catalog_file, "status"),
         chunk_count=getattr(catalog_file, "chunk_count"),
-        indexed_at=getattr(catalog_file, "indexed_at")
+        indexed_at=getattr(catalog_file, "indexed_at"),
     )
 
 
@@ -42,7 +44,7 @@ async def list_catalog_files(db: AsyncSession = Depends(get_async_db)):
             uploaded_at=getattr(file, "uploaded_at"),
             status=getattr(file, "status"),
             chunk_count=getattr(file, "chunk_count"),
-            indexed_at=getattr(file, "indexed_at")
+            indexed_at=getattr(file, "indexed_at"),
         )
         for file in files
     ]
@@ -50,26 +52,19 @@ async def list_catalog_files(db: AsyncSession = Depends(get_async_db)):
 
 @router.post("/index")
 async def index_catalogs(
-    background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_db)
+    background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_async_db)
 ):
     background_tasks.add_task(index_catalog_files, db)
     return {"message": "Indexing started"}
 
 
 @router.delete("/files/{file_uid}")
-async def delete_catalog(
-    file_uid: UUID,
-    db: AsyncSession = Depends(get_async_db)
-):
+async def delete_catalog(file_uid: str, db: AsyncSession = Depends(get_async_db)):
     await delete_catalog_file(db, file_uid)
     return {"message": "File deleted successfully"}
 
 
 @router.post("/unindex/{file_uid}")
-async def unindex_catalog(
-    file_uid: UUID,
-    db: AsyncSession = Depends(get_async_db)
-):
+async def unindex_catalog(file_uid: str, db: AsyncSession = Depends(get_async_db)):
     await unindex_catalog_file(db, file_uid)
     return {"message": "File unindexed successfully"}
