@@ -1,11 +1,12 @@
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, HttpUrl, Field
+from typing import List
 
 
 # Base schema (shared fields)
 class SessionBase(BaseModel):
-    counselor_uid: UUID  # Changed from str to UUID for input validation
+    counselor_uid: str
     description: str
     session_date: datetime
     recording_link: HttpUrl
@@ -18,14 +19,14 @@ class SessionCreate(SessionBase):
 
 # Update schema
 class SessionUpdate(BaseModel):
-    counselor_uid: UUID | None = None
+    counselor_uid: str | None = None
     session_date: datetime | None = None
     recording_link: HttpUrl | None = None
 
 
 # Counselor sub-schema (for response only)
 class CounselorInfo(BaseModel):
-    uid: UUID  # Changed from str to UUID
+    uid: str
     name: str
 
     model_config = {"from_attributes": True}
@@ -33,10 +34,18 @@ class CounselorInfo(BaseModel):
 
 # Response schema
 class SessionResponse(BaseModel):
-    uid: UUID
+    uid: str
     description: str
     session_date: datetime
     recording_link: HttpUrl
-    counselor: CounselorInfo  # 👈 nested counselor info
+    counselor: CounselorInfo  # nested counselor info
+
+
+# Paginated list response for sessions
+class SessionListResponse(BaseModel):
+    items: List[SessionResponse]
+    total: int
+    skip: int
+    limit: int
 
     model_config = {"from_attributes": True}

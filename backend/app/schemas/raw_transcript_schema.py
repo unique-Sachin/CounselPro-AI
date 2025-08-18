@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Any, Optional
 from datetime import datetime
 from uuid import UUID
 
@@ -20,20 +20,25 @@ class SessionInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SessionAnalysisBase(BaseModel):
+class RawTranscriptBase(BaseModel):
     session_uid: str
-    video_analysis_data: Any
-    audio_analysis_data: Any
+    total_segments: int
+    raw_transcript: Any  # JSON data
 
 
-class SessionAnalysisCreate(SessionAnalysisBase):
+class RawTranscriptCreate(RawTranscriptBase):
     pass
 
 
-class SessionAnalysisResponse(BaseModel):
+class RawTranscriptUpdate(BaseModel):
+    total_segments: Optional[int] = None
+    raw_transcript: Optional[Any] = None
+
+
+class RawTranscriptResponse(BaseModel):
     uid: str
-    video_analysis_data: Any
-    audio_analysis_data: Any
+    total_segments: int
+    raw_transcript: Any
     created_at: datetime
     updated_at: datetime
     session: SessionInfo

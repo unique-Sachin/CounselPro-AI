@@ -21,26 +21,20 @@ async def create_counselor(
 ) -> Counselor:
     try:
         new_counselor = Counselor(**counselor_in.model_dump())
-        print(new_counselor.__dict__)  # Debugging line to check the counselor data
         db.add(new_counselor)
         await db.commit()
         await db.refresh(new_counselor)
         return new_counselor
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Error creating counselor: {e}")
-
-        traceback.print_exc()
-        # return {"error": "Database Error", "details": str(e)}
-
         raise BaseAppException(
             error="Database Error",
-            details=str(e),  # 👈 actual SQLAlchemy error message
+            details=str(e),
             status_code=500,
         )
 
 
-async def get_counselor(db: AsyncSession, counselor_uid: UUID) -> Counselor:
+async def get_counselor(db: AsyncSession, counselor_uid: str) -> Counselor:
     try:
         result = await db.execute(
             select(Counselor).where(Counselor.uid == counselor_uid)
@@ -50,7 +44,6 @@ async def get_counselor(db: AsyncSession, counselor_uid: UUID) -> Counselor:
             raise NotFoundException(details=f"Counselor {counselor_uid} not found")
         return counselor
     except SQLAlchemyError as e:
-        logger.error(f"Error fetching counselor {counselor_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -59,7 +52,7 @@ async def get_counselor(db: AsyncSession, counselor_uid: UUID) -> Counselor:
 
 
 async def update_counselor(
-    db: AsyncSession, counselor_uid: UUID, updates: CounselorUpdate
+    db: AsyncSession, counselor_uid: str, updates: CounselorUpdate
 ) -> Counselor:
     try:
         counselor = await get_counselor(db, counselor_uid)
@@ -70,7 +63,6 @@ async def update_counselor(
         return counselor
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Error updating counselor {counselor_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -78,15 +70,14 @@ async def update_counselor(
         )
 
 
-async def delete_counselor(db: AsyncSession, counselor_uid: UUID) -> dict:
+async def delete_counselor(db: AsyncSession, counselor_uid: str) -> dict:
     try:
         counselor = await get_counselor(db, counselor_uid)
         await db.delete(counselor)
         await db.commit()
-        return {}
+        return {"message": "Counselor deleted Successfully"}
     except SQLAlchemyError as e:
         await db.rollback()
-        logger.error(f"Error deleting counselor {counselor_uid}: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
@@ -96,12 +87,16 @@ async def delete_counselor(db: AsyncSession, counselor_uid: UUID) -> dict:
 
 async def get_all_counselors(db: AsyncSession, skip: int = 0, limit: int = 10):
     try:
+        # Get total count
+        total_result = await db.execute(select(Counselor))
+        total = len(total_result.scalars().all())
+
+        # Get paginated items
         query = select(Counselor).offset(skip).limit(limit)
         result = await db.execute(query)
         counselors = result.scalars().all()
-        return counselors
+        return counselors, total
     except SQLAlchemyError as e:
-        logger.error(f"Error fetching all counselors: {e}")
         raise BaseAppException(
             error="Database Error",
             details=str(e),
