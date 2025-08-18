@@ -1,4 +1,5 @@
 from app.models.video_analysis import AttireAndBackgroundAnalysis
+from app.service.video_processing.video_response import VideoResponse
 import cv2
 import numpy as np
 import os
@@ -123,72 +124,8 @@ class VideoProcessor:
             logger.info("Starting visual intelligence analysis")
             attireAndBackgroundAnalysis = self._perform_visual_analysis_from_frames(frames_data, camera_analysis['detailed_results']['camera_timeline'])
 
-
-            # Construct the structured response for frontend
-            logger.info("Constructing final results")
-            results = {
-                # Basic video information
-                "video_info": {
-                    "duration_seconds": round(duration, 2),
-                    "frame_count": frame_count,
-                    "fps": round(fps, 2),
-                    "audio_path": audio_path,
-                    "dimensions": {
-                        "width": metadata['width'],
-                        "height": metadata['height']
-                    }
-                },
-                "audio_path" : audio_path,
-
-                # Camera analysis results
-                "camera_analysis": {
-                    "overall_status": "On" if camera_analysis['summary']['camera_on_overall'] else "Off",
-                    "metrics": {
-                        "on_percentage": round(camera_analysis['summary']['camera_on_percentage'], 2),
-                        "total_samples": camera_analysis['summary']['total_samples_analyzed'],
-                        "samples_with_faces": camera_analysis['summary']['samples_with_faces'],
-                        "face_detection_rate": round(
-                            (camera_analysis['summary']['samples_with_faces'] /
-                            max(camera_analysis['summary']['total_samples_analyzed'], 1)) * 100, 2
-                        )
-                    },
-                    "off_periods": {
-                        "count": camera_analysis['summary']['significant_off_periods'],
-                        "total_duration": camera_analysis['summary']['total_off_duration'],
-                        "details": camera_analysis['detailed_results']['off_periods']
-                    },
-
-                    # Detailed frame-by-frame timeline for UI
-                    "timeline": [
-                        {
-                            "timestamp": frame['timestamp'],
-                            "timestamp_formatted": self._format_timestamp(frame['timestamp']),
-                            "camera_status": "on" if frame['camera_on'] else "off",
-                            "faces": {
-                                "count": frame['face_count'],
-                                "positions": frame['face_positions']
-                            },
-                            "has_static_images": frame.get('has_static_images', False),
-                            "static_count": frame.get('static_count', 0),
-                            "person_ids": frame.get('person_ids', {})
-                        }
-                        for frame in camera_analysis['detailed_results']['camera_timeline']
-                    ]
-                },
-
-                # Visual intelligence results
-                "attireAndBackgroundAnalysis": attireAndBackgroundAnalysis,
-
-                # Analysis summary
-                "analysis_summary": {
-                    "overall_success": True,
-                    "camera_working": camera_analysis['summary']['camera_on_overall'],
-                    "visual_analysis_completed": bool(getattr(attireAndBackgroundAnalysis, 'success', False)),
-                    "total_people_detected": camera_analysis['summary'].get('person_count', 0),
-                    "static_images_detected": camera_analysis['summary'].get('static_image_detection', {}).get('persons_with_static_images', 0)
-                },
-
-            }
+            video_response = VideoResponse()
+            results = video_response._format_ui_friendly_results(camera_analysis, attireAndBackgroundAnalysis, metadata, audio_path)
 
             logger.info("Video analysis completed successfully")
             return results
@@ -209,6 +146,7 @@ class VideoProcessor:
                 logger.debug("Cleanup completed successfully")
             except Exception as cleanup_error:
                 logger.warning(f"Error during cleanup: {cleanup_error}")
+
 
     def analyze_camera_status_from_frames(self, frames_data: dict, duration: float, fps: float):
         """
@@ -469,8 +407,6 @@ class VideoProcessor:
         return score
 
 
-
-
     def _is_static_image(self, current_frame, person_id, person_frame_history, similarity_threshold=0.95):
         """Determine if a person's image is static (like a profile picture)"""
         if person_id not in person_frame_history or len(person_frame_history[person_id]) < 3:
@@ -608,7 +544,6 @@ class VideoProcessor:
 
         return off_periods, person_off_periods if person_timelines else off_periods
 
-    # --- Visual Analysis Methods (Updated for Frame-Based Processing) ---
 
     def _encode_frame_to_base64(self, frame):
         """Encode a frame to base64 for Gemini API"""

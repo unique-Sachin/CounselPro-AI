@@ -94,9 +94,9 @@ async def delete_counseling_session(
     return await delete_session(db, session_uid)
 
 
-@router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
+@router.get("/{session_uid}/analysis")
 async def get_session_analysis(
     session_id: UUID, db: AsyncSession = Depends(get_async_db)
 ):
     results = await process_video_background(db, session_id)
-    return VideoAnalysisResponse(**results)
+    return results
