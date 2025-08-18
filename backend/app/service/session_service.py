@@ -1,9 +1,9 @@
 import logging
 from uuid import UUID
 from app.service.video_processing.video_processing import VideoProcessor
-# from service.video_processing.video_processing import VideoProcessor
 from app.service.audio_processing.deepgram_transcriber import DeepgramTranscriber
 from app.service.course_verification.course_verifier import CourseVerifier
+from app.service.video_processing.video_extraction import VideoExtractor
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -241,21 +241,23 @@ async def delete_session(db: AsyncSession, session_uid: UUID):
         )
 
 
-async def process_video_background(session_uid: UUID, video_url: str):
+async def process_video_background(db: AsyncSession, session_uid: UUID):
     """
     Background task to process video for a counseling session.
     This function runs asynchronously after session creation.
     """
     try:
         print(f"Starting video processing for session {session_uid}")
+        sessionResponse = await get_session_by_id(db, session_uid)
+
+        extraction = VideoExtractor()
+        extraction_data = extraction.get_video_frames_and_audio_paths(str(sessionResponse.recording_link))
 
         # Initialize video processor
         video_processor = VideoProcessor()
+        results = await video_processor.analyze_video(extraction_data)
 
-        # Process the video
-        results = await video_processor.analyze_video(video_url)
-
-        audio_path = results.get("audio_path")
+        audio_path = extraction_data.get("audio_path")
         # If transcription wasn't already done in video processing, do it here
         if audio_path:
             try:
@@ -271,7 +273,6 @@ async def process_video_background(session_uid: UUID, video_url: str):
             
         
         print(f"Video processing completed for session {session_uid}")
-        print(f"Results: {results}")
 
         # Verify course information if transcription was successful
         if results.get("transcript_path"):
@@ -328,3 +329,8 @@ async def process_video_background(session_uid: UUID, video_url: str):
             details=str(e),
             status_code=500,
         )
+    finally:
+            try:
+                extraction.cleanup()
+            except Exception as cleanup_error:
+                logger.warning(f"Error during cleanup: {cleanup_error}")

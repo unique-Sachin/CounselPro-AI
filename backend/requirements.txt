@@ -47,7 +47,6 @@ redis
 opencv-python
 numpy
 requests
-mediapipe
 scikit-image
 
 # Audio Processing
@@ -60,4 +59,6 @@ google-generativeai
 
 #Email Sending
 aiosmtplib
+
+ultralytics
 

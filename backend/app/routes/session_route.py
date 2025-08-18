@@ -27,12 +27,6 @@ async def create_counseling_session(
 ):
     # Create the session first
     session = await create_session(db, session_in)
-
-    await process_video_background(session.uid, str(session.recording_link)) # type: ignore
-    # Add video processing as background task
-    # background_tasks.add_task(
-    # )
-
     return session
 
 
@@ -94,7 +88,7 @@ async def delete_counseling_session(
 
 @router.get("/{session_id}/analysis", response_model=VideoAnalysisResponse)
 async def get_session_analysis(
-    session_id: UUID, video_url: str, db: AsyncSession = Depends(get_async_db)
+    session_id: UUID, db: AsyncSession = Depends(get_async_db)
 ):
-    results = await process_video_background(session_id, video_url)
+    results = await process_video_background(db, session_id)
     return VideoAnalysisResponse(**results)
