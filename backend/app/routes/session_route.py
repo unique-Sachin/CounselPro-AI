@@ -35,9 +35,9 @@ async def create_counseling_session(
 
     # Add video processing as background task
     # background_tasks.add_task(
-    #     process_video_background, session.uid, str(session.recording_link)
+    #     process_video_background, session.uid, str(session.recording_link), db
     # )
-    await process_video_background(session.uid, str(session.recording_link))  # type: ignore
+    await process_video_background(session.uid, str(session.recording_link), db)  # type: ignore
 
     return session
 
@@ -105,5 +105,5 @@ async def delete_counseling_session(
 async def get_session_analysis(
     session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
 ):
-    results = await process_video_background(session_uid, video_url)
+    results = await process_video_background(session_uid, video_url, db)
     return VideoAnalysisResponse(**results)

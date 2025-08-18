@@ -16,22 +16,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class DeepgramTranscriber:
-    def __init__(self, api_key: Optional[str] = None, output_dir: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv('DEEPGRAM_API_KEY')
         if not self.api_key:
             raise ValueError("DEEPGRAM_API_KEY not found")
         
         self.client = DeepgramClient(self.api_key)
-        
-        if output_dir is None:
-            current_file = Path(__file__).resolve()
-            project_root = current_file.parents[4]
-            self.output_dir = project_root / "backend" / "assets" / "transcripts_raw"
-        else:
-            self.output_dir = Path(output_dir)
-        
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Output directory: {self.output_dir}")
 
     def _format_time(self, seconds: float) -> str:
         hours = int(seconds // 3600)
@@ -131,9 +121,8 @@ class DeepgramTranscriber:
         
         return labeled_utterances
 
-    def transcribe_chunk(self, chunk_path: str, chunk_name: str) -> str:
+    def transcribe_chunk(self, chunk_path: str, chunk_name: str) -> Dict[str, Any]:
         chunk_file = Path(chunk_path)
-        output_path = self.output_dir / f"chunk_{chunk_name}.json"
         
         logger.info(f"Transcribing chunk {chunk_name}: {chunk_file.name}")
         
@@ -169,10 +158,8 @@ class DeepgramTranscriber:
             "utterances": utterances
         }
         
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(formatted_output, f, indent=2, ensure_ascii=False)
-        
-        return str(output_path)
+        # Return the transcript data instead of saving to file
+        return formatted_output
 
     # def transcribe_chunks(self, chunk_paths: List[str]) -> List[str]:
     #     logger.info(f"Starting transcription of {len(chunk_paths)} chunks")

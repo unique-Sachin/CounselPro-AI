@@ -1,10 +1,13 @@
 import logging
+import json
 from uuid import UUID
 from app.service.video_processing.video_processing import VideoProcessor
 
 # from service.video_processing.video_processing import VideoProcessor
 from app.service.audio_processing.deepgram_transcriber import DeepgramTranscriber
 from app.service.course_verification.course_verifier import CourseVerifier
+from app.service.raw_transcript_service import create_raw_transcript
+from app.schemas.raw_transcript_schema import RawTranscriptCreate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -251,7 +254,7 @@ async def delete_session(db: AsyncSession, session_uid: str):
         )
 
 
-async def process_video_background(session_uid: str, video_url: str):
+async def process_video_background(session_uid: str, video_url: str, db: AsyncSession):
     """
     Background task to process video for a counseling session.
     This function runs asynchronously after session creation.
@@ -266,15 +269,34 @@ async def process_video_background(session_uid: str, video_url: str):
         results = await video_processor.analyze_video(video_url)
 
         audio_path = results.get("audio_path")
+        transcript_data = None
+        
         # If transcription wasn't already done in video processing, do it here
         if audio_path:
             try:
                 print(f"Starting Deepgram transcription for audio: {audio_path}")
                 transcriber = DeepgramTranscriber()
-                transcript_path = transcriber.transcribe_chunk(audio_path, session_uid)
-                print(f"Transcription completed: {transcript_path}")
-                # Add transcript path to results
-                results["transcript_path"] = transcript_path
+                transcript_data = transcriber.transcribe_chunk(audio_path, session_uid)
+                print(f"Transcription completed successfully")
+                
+                # Save transcript to database
+                try:
+                    total_segments = len(transcript_data.get("utterances", []))
+                    transcript_create = RawTranscriptCreate(
+                        session_uid=session_uid,
+                        total_segments=total_segments,
+                        raw_transcript=transcript_data
+                    )
+                    
+                    saved_transcript = await create_raw_transcript(db, transcript_create)
+                    print(f"Transcript saved to database with UID: {saved_transcript.uid}")
+                    results["transcript_saved"] = True
+                    results["transcript_uid"] = saved_transcript.uid
+                    
+                except Exception as db_error:
+                    print(f"Warning: Failed to save transcript to database: {db_error}")
+                    results["transcript_db_error"] = str(db_error)
+                    
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
                 results["transcription_error"] = str(transcription_error)
@@ -283,16 +305,11 @@ async def process_video_background(session_uid: str, video_url: str):
         print(f"Results: {results}")
 
         # Verify course information if transcription was successful
-        if results.get("transcript_path"):
+        if transcript_data:
             try:
                 print(f"Starting course verification for session {session_uid}")
 
-                # Load transcript data
-                import json
-
-                with open(results["transcript_path"], "r", encoding="utf-8") as f:
-                    transcript_data = json.load(f)
-
+                # Use transcript data directly instead of loading from file
                 # Initialize course verifier
                 verifier = CourseVerifier()
 

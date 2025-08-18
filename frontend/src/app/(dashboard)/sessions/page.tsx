@@ -216,9 +216,9 @@ export default function SessionsPage() {
 
             {/* Pagination */}
             {!isLoading && sessionsData && sessionsData.total > ITEMS_PER_PAGE && (
-              <div className="flex items-center justify-between px-2 py-4">
+              <div className="flex items-center justify-between px-2 py-4 border-t mt-6">
                 <div className="text-sm text-muted-foreground">
-                  Showing {skip + 1} to {Math.min(skip + ITEMS_PER_PAGE, sessionsData.total)} of {sessionsData.total} results
+                  Showing {sessionsData.skip + 1} to {Math.min(sessionsData.skip + sessionsData.limit, sessionsData.total)} of {sessionsData.total} results
                 </div>
                 <div className="flex items-center space-x-2">
                   <Button

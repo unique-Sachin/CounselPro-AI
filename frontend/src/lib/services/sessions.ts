@@ -10,16 +10,8 @@ import {
 // List sessions with pagination
 export const listSessions = async (params: PaginationParams = { skip: 0, limit: 10 }) => {
   try {
-    const response = await apiHelpers.get<SessionResponse[]>("/sessions/all", params as Record<string, unknown>);
-    const sessions = response.data;
-    
-    // Transform the array response into paginated format
-    return {
-      items: sessions,
-      total: sessions.length,
-      skip: params.skip || 0,
-      limit: params.limit || 10,
-    } as PaginatedResponse<SessionResponse>;
+    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>("/sessions/all", params as Record<string, unknown>);
+    return response.data;
   } catch (error) {
     console.error("Failed to fetch sessions:", error);
     // Return empty result structure for graceful UI handling
@@ -88,19 +80,11 @@ export const listSessionsByCounselor = async (
   params: PaginationParams = { skip: 0, limit: 10 }
 ) => {
   try {
-    const response = await apiHelpers.get<SessionResponse[]>(
+    const response = await apiHelpers.get<PaginatedResponse<SessionResponse>>(
       `/sessions/by-counselor/${counselorUid}`, 
       params as Record<string, unknown>
     );
-    const sessions = response.data;
-    
-    // Transform the array response into paginated format
-    return {
-      items: sessions,
-      total: sessions.length,
-      skip: params.skip || 0,
-      limit: params.limit || 10,
-    } as PaginatedResponse<SessionResponse>;
+    return response.data;
   } catch (error) {
     console.error("Failed to fetch sessions by counselor:", error);
     // Return empty result structure for graceful UI handling

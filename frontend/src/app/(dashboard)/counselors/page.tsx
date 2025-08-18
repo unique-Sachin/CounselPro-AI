@@ -27,7 +27,7 @@ import {
   Phone,
   Mail
 } from "lucide-react";
-import { listCounselors } from "@/lib/services/counselors";
+import { listCounselors } from "@/lib/services/counselor-service";
 import { CounselorForm } from "@/components/counselors/counselor-form";
 import { DeleteCounselorDialog } from "@/components/counselors/delete-counselor-dialog";
 
@@ -114,7 +114,7 @@ export default function CounselorsPage() {
     isError
   } = useQuery({
     queryKey: ["counselors", skip, ITEMS_PER_PAGE],
-    queryFn: () => listCounselors({ skip, limit: ITEMS_PER_PAGE }),
+    queryFn: () => listCounselors(skip, ITEMS_PER_PAGE),
     staleTime: 30000, // 30 seconds
   });
 
@@ -124,7 +124,7 @@ export default function CounselorsPage() {
     return (
       counselor.name.toLowerCase().includes(searchLower) ||
       counselor.email.toLowerCase().includes(searchLower) ||
-      counselor.specialty.toLowerCase().includes(searchLower)
+      counselor.dept.toLowerCase().includes(searchLower)
     );
   }) || [];
 
@@ -236,12 +236,12 @@ export default function CounselorsPage() {
                           </TableCell>
                           <TableCell>
                             <code className="text-xs bg-muted px-2 py-1 rounded">
-                              {counselor.uid.split('-')[0].toUpperCase()}
+                              {counselor.employee_id}
                             </code>
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
-                              {counselor.specialty}
+                              {counselor.dept}
                             </Badge>
                           </TableCell>
                           <TableCell>
@@ -251,25 +251,31 @@ export default function CounselorsPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {counselor.phone ? (
+                            {counselor.mobile_number ? (
                               <div className="flex items-center space-x-2">
                                 <Phone className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-sm">{counselor.phone}</span>
+                                <span className="text-sm">{counselor.mobile_number}</span>
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-sm">—</span>
                             )}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                counselor.availability_status === "available" ? "default" :
-                                counselor.availability_status === "busy" ? "destructive" : 
-                                "secondary"
-                              }
-                            >
-                              {counselor.availability_status}
-                            </Badge>
+                            {counselor.availability_status ? (
+                              <Badge
+                                variant={
+                                  counselor.availability_status === "available" ? "default" :
+                                  counselor.availability_status === "busy" ? "destructive" : 
+                                  "secondary"
+                                }
+                              >
+                                {counselor.availability_status}
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                unknown
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end space-x-2">
@@ -299,9 +305,9 @@ export default function CounselorsPage() {
 
               {/* Pagination */}
               {!isLoading && counselorsData && counselorsData.total > ITEMS_PER_PAGE && (
-                <div className="flex items-center justify-between px-2 py-4">
+                <div className="flex items-center justify-between px-2 py-4 border-t mt-6">
                   <div className="text-sm text-muted-foreground">
-                    Showing {skip + 1} to {Math.min(skip + ITEMS_PER_PAGE, counselorsData.total)} of {counselorsData.total} results
+                    Showing {counselorsData.skip + 1} to {Math.min(counselorsData.skip + counselorsData.limit, counselorsData.total)} of {counselorsData.total} results
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button
