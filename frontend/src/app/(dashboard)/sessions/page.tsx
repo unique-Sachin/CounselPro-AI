@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { listSessions, listSessionsByCounselor, getCounselors } from "@/lib/services/sessions";
+import { listSessions, listSessionsByCounselor } from "@/lib/services/sessions";
+import { listCounselors } from "@/lib/services/counselor-service";
 import Link from "next/link";
 
 const ITEMS_PER_PAGE = 10;
@@ -32,12 +33,14 @@ export default function SessionsPage() {
 
   // Fetch counselors for the filter dropdown
   const {
-    data: counselors,
+    data: counselorsData,
   } = useQuery({
     queryKey: ["counselors"],
-    queryFn: getCounselors,
+    queryFn: () => listCounselors(0, 100), // Get more counselors for dropdown
     staleTime: 300000, // 5 minutes
   });
+
+  const counselors = counselorsData?.items || [];
 
   // Fetch sessions with React Query - either all sessions or by counselor
   const {

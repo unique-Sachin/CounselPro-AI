@@ -97,39 +97,65 @@ export const listSessionsByCounselor = async (
   }
 };
 
-// Get unique counselors from all sessions
-export const getCounselors = async () => {
+// Trigger session analysis
+export const analyzeSession = async (sessionUid: string) => {
   try {
-    const allCounselors = new Map();
-    let skip = 0;
-    const limit = 100; // Maximum allowed by API
-    let hasMore = true;
-
-    while (hasMore) {
-      const sessionsData = await listSessions({ skip, limit });
-      
-      // Add counselors to our map
-      sessionsData.items.forEach(session => {
-        if (session.counselor && session.counselor.uid && session.counselor.name) {
-          allCounselors.set(session.counselor.uid, {
-            uid: session.counselor.uid,
-            name: session.counselor.name
-          });
-        }
-      });
-
-      // Check if we have more data to fetch
-      hasMore = sessionsData.items.length === limit;
-      skip += limit;
-
-      // Safety break to avoid infinite loops
-      if (skip > 1000) break;
-    }
-    
-    return Array.from(allCounselors.values());
+    const response = await apiHelpers.get(`/sessions/${sessionUid}/analysis`, {
+      session_id: sessionUid
+    });
+    return response.data;
   } catch (error) {
-    console.error("Failed to fetch counselors:", error);
-    return [];
+    console.error("Failed to analyze session:", error);
+    throw error; // Re-throw to let the UI handle the error
+  }
+};
+
+// Types for raw transcript response
+interface RawTranscriptResponse {
+  uid: string;
+  total_segments: number;
+  raw_transcript: {
+    metadata: {
+      chunk_name: string;
+      processing_time_seconds: number;
+      timestamp: string;
+      role_mapping: {
+        counselor: number;
+        student: number;
+      };
+      total_speakers: number;
+    };
+    utterances: Array<{
+      speaker: number;
+      text: string;
+      start_time: string;
+      end_time: string;
+      confidence: number;
+      role: string;
+    }>;
+  };
+  created_at: string;
+  updated_at: string;
+  session: {
+    uid: string;
+    description: string;
+    session_date: string;
+    counselor: {
+      uid: string;
+      name: string;
+    };
+  };
+}
+
+// Get raw transcript by session UID
+export const getRawTranscript = async (sessionUid: string): Promise<RawTranscriptResponse | null> => {
+  try {
+    const response = await apiHelpers.get<RawTranscriptResponse>(`/raw-transcripts/by-session/${sessionUid}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch raw transcript:", error);
+    // Return null instead of throwing error to handle gracefully
+    return null;
   }
 };
 
@@ -141,5 +167,6 @@ export const sessionService = {
   updateSession,
   deleteSession,
   listSessionsByCounselor,
-  getCounselors,
+  analyzeSession,
+  getRawTranscript,
 };
