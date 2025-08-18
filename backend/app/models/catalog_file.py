@@ -12,6 +12,8 @@ class CatalogFile(Base):
     uid = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True, nullable=False)
     filename = Column(String, nullable=False)
     file_path = Column(String, nullable=False)
+    size = Column(Integer, nullable=False)
+    type = Column(String, nullable=False)
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     status = Column(String, default="uploaded", nullable=False)
     chunk_count = Column(Integer, default=0)

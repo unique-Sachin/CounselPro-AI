@@ -10,7 +10,6 @@ import {
   Users, 
   MessageSquare,
   Settings,
-  PlayCircle,
   FolderOpen
 } from "lucide-react";
 
@@ -34,11 +33,6 @@ const sidebarItems = [
     title: "Catalogs",
     href: "/catalogs",
     icon: FolderOpen,
-  },
-  {
-    title: "Demo",
-    href: "/counselors-demo",
-    icon: PlayCircle,
   },
 ];
 

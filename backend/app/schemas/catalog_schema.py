@@ -7,6 +7,8 @@ from typing import Optional
 class CatalogFileResponse(BaseModel):
     uid: UUID
     filename: str
+    size: int
+    type: str
     uploaded_at: datetime
     status: str
     chunk_count: int

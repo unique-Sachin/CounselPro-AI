@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "chunk_name": "efe7842a-c12b-41e8-96e5-4e42ab2ab588",
-    "processing_time_seconds": 17.93,
-    "timestamp": "2025-08-16T20:58:43Z",
+    "chunk_name": "9d64ccc0-b868-405c-9bd4-f58232241342",
+    "processing_time_seconds": 8.06,
+    "timestamp": "2025-08-18T13:02:05Z",
     "role_mapping": {
       "counselor": 0,
       "student": 1
@@ -55,7 +55,7 @@
       "text": "that now I don't even really want to get in the car. I don't it's very stressful for me to even drive to work,",
       "start_time": "00:00:21.84",
       "end_time": "00:00:28.08",
-      "confidence": 0.94,
+      "confidence": 0.95,
       "role": "counselor"
     },
     {
@@ -404,10 +404,18 @@
     },
     {
       "speaker": 0,
-      "text": "as I'm holding on to the wheel and I can even hear the sound of like brakes squealing.",
+      "text": "as I'm holding on to",
       "start_time": "00:03:19.46",
+      "end_time": "00:03:21.14",
+      "confidence": 0.92,
+      "role": "counselor"
+    },
+    {
+      "speaker": 0,
+      "text": "the wheel and I can even hear the sound of like brakes squealing.",
+      "start_time": "00:03:21.30",
       "end_time": "00:03:25.86",
-      "confidence": 0.91,
+      "confidence": 0.9,
       "role": "counselor"
     },
     {
