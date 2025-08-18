@@ -49,7 +49,7 @@ async def list_catalog_files(db: AsyncSession = Depends(get_async_db)):
             uploaded_at=getattr(file, "uploaded_at"),
             status=getattr(file, "status"),
             chunk_count=getattr(file, "chunk_count"),
-            indexed_at=getattr(file, "indexed_at")
+            indexed_at=getattr(file, "indexed_at"),
         )
         for file in files
     ]
@@ -76,10 +76,7 @@ async def index_catalogs(
 
 
 @router.delete("/files/{file_uid}")
-async def delete_catalog(
-    file_uid: UUID,
-    db: AsyncSession = Depends(get_async_db)
-):
+async def delete_catalog(file_uid: str, db: AsyncSession = Depends(get_async_db)):
     await delete_catalog_file(db, file_uid)
     return {"message": "File deleted successfully"}
 

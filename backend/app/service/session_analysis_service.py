@@ -52,7 +52,7 @@ async def create_session_analysis(
     return result.scalar_one_or_none()
 
 
-async def get_analysis_by_uid(db: AsyncSession, uid: UUID) -> Optional[SessionAnalysis]:
+async def get_analysis_by_uid(db: AsyncSession, uid: str) -> Optional[SessionAnalysis]:
     stmt = (
         select(SessionAnalysis)
         .options(
@@ -65,7 +65,7 @@ async def get_analysis_by_uid(db: AsyncSession, uid: UUID) -> Optional[SessionAn
 
 
 async def get_analysis_by_session_uid(
-    db: AsyncSession, session_uid: UUID
+    db: AsyncSession, session_uid: str
 ) -> Optional[SessionAnalysis]:
     stmt = (
         select(SessionAnalysis)
@@ -80,7 +80,7 @@ async def get_analysis_by_session_uid(
 
 
 async def update_session_analysis(
-    db: AsyncSession, uid: UUID, session_analysis: SessionAnalysisCreate
+    db: AsyncSession, uid: str, session_analysis: SessionAnalysisCreate
 ) -> Optional[SessionAnalysis]:
     stmt = (
         select(SessionAnalysis)
@@ -101,7 +101,7 @@ async def update_session_analysis(
     return db_analysis
 
 
-async def delete_session_analysis(db: AsyncSession, uid: UUID) -> bool:
+async def delete_session_analysis(db: AsyncSession, uid: str) -> bool:
     stmt = select(SessionAnalysis).where(SessionAnalysis.uid == uid)
     result = await db.execute(stmt)
     db_analysis = result.scalar_one_or_none()
