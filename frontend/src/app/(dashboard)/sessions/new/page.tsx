@@ -89,7 +89,7 @@ export default function NewSessionPage() {
     error: counselorsError
   } = useQuery({
     queryKey: ["counselors", { skip: 0, limit: 100 }], // Get all counselors
-    queryFn: () => listCounselors({ skip: 0, limit: 100 }),
+    queryFn: () => listCounselors(0, 100),
     staleTime: 30000, // 30 seconds
   });
 
@@ -195,7 +195,7 @@ export default function NewSessionPage() {
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium">{counselor.name}</span>
                                     <span className="text-muted-foreground text-sm">
-                                      • {counselor.specialty}
+                                      • {counselor.dept}
                                     </span>
                                   </div>
                                 </SelectItem>

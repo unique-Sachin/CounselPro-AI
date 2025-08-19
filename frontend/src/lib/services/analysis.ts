@@ -23,6 +23,19 @@ export const getSessionAnalysisBySession = async (sessionUid: string): Promise<S
 };
 
 /**
+ * Trigger session analysis
+ * Endpoint: GET /sessions/{uid}/analysis?session_id={uid}
+ */
+export const triggerSessionAnalysis = async (sessionUid: string): Promise<void> => {
+  try {
+    await apiHelpers.get(`/sessions/${sessionUid}/analysis`, { session_id: sessionUid });
+  } catch (error) {
+    console.error("Failed to trigger session analysis:", error);
+    throw error;
+  }
+};
+
+/**
  * React Query hook for session analysis
  * @param sessionUid - The session UID to fetch analysis for
  * @param options - Optional configuration for the query
@@ -82,6 +95,7 @@ export const useSessionAnalysisWithPolling = (
 // Export all analysis services
 export const analysisService = {
   getSessionAnalysisBySession,
+  triggerSessionAnalysis,
   useSessionAnalysis,
   useSessionAnalysisWithPolling,
 };

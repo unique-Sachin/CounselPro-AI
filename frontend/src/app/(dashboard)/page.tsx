@@ -1,5 +1,11 @@
-import { PageTransition } from "@/components/page-transition";
+import dynamic from "next/dynamic";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Dynamically import PageTransition to avoid SSR issues
+const PageTransition = dynamic(
+  () => import("@/components/page-transition").then((mod) => ({ default: mod.PageTransition })),
+  { ssr: false }
+);
 
 export default function DashboardPage() {
   return (

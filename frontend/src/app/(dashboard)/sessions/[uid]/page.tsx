@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import AnalysisTab from "./analysis-tab";
 export default function SessionDetailsPage() {
   const params = useParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const sessionUid = params.uid as string;
   const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
 
@@ -63,6 +64,15 @@ export default function SessionDetailsPage() {
       toast.success("Analysis Completed", {
         description: "Session analysis has been completed successfully.",
       });
+      
+      // Invalidate and refetch both session analysis and raw transcript data
+      queryClient.invalidateQueries({
+        queryKey: ['session-analysis', sessionUid]
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['raw-transcript', sessionUid]
+      });
+      
       // Release global lock
       setIsAnalyzing(false);
       setSessionUid(null);
@@ -175,7 +185,7 @@ export default function SessionDetailsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Tabs defaultValue="details" className="space-y-6">
+          <Tabs defaultValue="details">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details" disabled={isAnalyzing}>
                 Session Details
@@ -189,7 +199,7 @@ export default function SessionDetailsPage() {
             </TabsList>
 
             {/* Session Details Tab */}
-            <TabsContent value="details" className="space-y-6">
+            <TabsContent value="details" className="space-y-6 mt-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -319,12 +329,12 @@ export default function SessionDetailsPage() {
             </TabsContent>
 
             {/* Transcript Tab */}
-            <TabsContent value="transcript" className="space-y-6">
+            <TabsContent value="transcript" className="mt-6">
               <TranscriptViewer sessionUid={sessionUid} />
             </TabsContent>
 
             {/* Analysis Tab */}
-            <TabsContent value="analysis" className="space-y-6">
+            <TabsContent value="analysis" className="mt-6">
               <AnalysisTab />
             </TabsContent>
           </Tabs>
