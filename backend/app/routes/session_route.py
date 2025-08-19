@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from app.models.video_analysis import VideoAnalysisResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
+from app.service.celery.celery_worker import process_video
 
 from app.db.database import get_async_db
 from app.schemas.session_schema import (
@@ -106,4 +107,14 @@ async def get_session_analysis(
     session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
 ):
     results = await process_video_background(session_uid, video_url)
+    return VideoAnalysisResponse(**results)
+
+
+@router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
+async def get_session_analysis_using_celery_background_task(
+    session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
+):
+    # Send task to Celery worker
+    task = process_video.delay(video_url)
+    return {"task_id": task.id, "status": "Processing started"}
     return VideoAnalysisResponse(**results)
