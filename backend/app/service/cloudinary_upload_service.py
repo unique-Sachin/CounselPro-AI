@@ -78,6 +78,16 @@ async def upload_file_to_cloudinary(
         # Reset file pointer for potential future use
         await file.seek(0)
 
+        # ✅ Auto-detect resource_type
+        ext = file.filename.split(".")[-1].lower()
+        if resource_type == "auto":
+            if ext in ["jpg", "jpeg", "png", "gif", "webp", "bmp"]:
+                resource_type = "image"
+            elif ext in ["mp4", "mov", "avi", "mkv", "webm"]:
+                resource_type = "video"
+            else:
+                resource_type = "raw"
+
         # Prepare upload options
         upload_options = {
             "folder": folder,
@@ -85,6 +95,7 @@ async def upload_file_to_cloudinary(
             "overwrite": overwrite,
             "use_filename": True,
             "unique_filename": not overwrite,
+            "resource_type": resource_type,
         }
 
         if public_id:
@@ -116,7 +127,7 @@ async def upload_file_to_cloudinary(
             "public_id": result["public_id"],
             "secure_url": result["secure_url"],
             "url": result["url"],
-            "format": result["format"],
+            "format": result.get("format", None),
             "resource_type": result["resource_type"],
             "bytes": result["bytes"],
             "created_at": result["created_at"],

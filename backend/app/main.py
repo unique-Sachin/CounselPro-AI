@@ -8,7 +8,7 @@ from app.routes.session_route import router as session_router
 from app.routes.catalog_route import router as catalog_router
 from app.routes.session_analysis_route import router as session_analysis_router
 from app.routes.raw_transcript_route import router as raw_transcript_router
-from app.routes.cloudinary_route import router as test_router
+from app.routes.cloudinary_route import router as cloudinary_test_router
 from contextlib import asynccontextmanager
 import uvicorn
 import time
@@ -86,7 +86,7 @@ app.include_router(session_router)
 app.include_router(catalog_router)
 app.include_router(session_analysis_router)
 app.include_router(raw_transcript_router)
-app.include_router(test_router)
+app.include_router(cloudinary_test_router)
 
 
 @app.get("/", tags=["Health Check"])

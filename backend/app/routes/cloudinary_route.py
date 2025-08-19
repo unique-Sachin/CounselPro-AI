@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/test", tags=["Test"])
+router = APIRouter(prefix="/test", tags=["Cloudinary Test"])
 
 
 @router.post("/upload")
