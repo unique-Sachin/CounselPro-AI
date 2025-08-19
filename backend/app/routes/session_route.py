@@ -33,13 +33,6 @@ async def create_counseling_session(
 ):
     # Create the session first
     session = await create_session(db, session_in)
-
-    # Add video processing as background task
-    # background_tasks.add_task(
-    #     process_video_background, session.uid, str(session.recording_link)
-    # )
-    await process_video_background(session.uid, str(session.recording_link))  # type: ignore
-
     return session
 
 
@@ -102,19 +95,9 @@ async def delete_counseling_session(
     return await delete_session(db, session_uid)
 
 
-@router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
+@router.get("/{session_uid}/analysis")
 async def get_session_analysis(
-    session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
+    session_id: UUID, db: AsyncSession = Depends(get_async_db)
 ):
-    results = await process_video_background(session_uid, video_url)
-    return VideoAnalysisResponse(**results)
-
-
-@router.get("/{session_uid}/analysis", response_model=VideoAnalysisResponse)
-async def get_session_analysis_using_celery_background_task(
-    session_uid: str, video_url: str, db: AsyncSession = Depends(get_async_db)
-):
-    # Send task to Celery worker
-    task = process_video.delay(video_url)
-    return {"task_id": task.id, "status": "Processing started"}
-    return VideoAnalysisResponse(**results)
+    results = await process_video_background(db, session_id)
+    return results

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Any, Dict
 
 from pydantic import BaseModel
@@ -26,15 +26,10 @@ class OffPeriods(BaseModel):
     total_duration: float
     details: List[Dict[str, Any]]
 
-class ProofData(BaseModel):
-    frames_count: int
-    frames: List[Dict[str, Any]]
-
 class CameraAnalysis(BaseModel):
     overall_status: str
     metrics: CameraMetrics
     off_periods: OffPeriods
-    proof_data: ProofData
     timeline: List[Dict[str, Any]]
 
 class AnalysisItem(BaseModel):
@@ -51,11 +46,13 @@ class VisualMetrics(BaseModel):
     total_frames_analyzed: int
     analysis_coverage_percentage: float
 
-class VisualIntelligence(BaseModel):
-    overall_success: bool
-    analyses: VisualAnalyses
-    metrics: VisualMetrics
-    error: Optional[str] = None
+class AttireAndBackgroundAnalysis(BaseModel):
+    success: bool = Field(..., description="Whether analysis was successful")
+    attire_analysis: str = Field(..., description="Overall assessment of attire professionalism across all frames")
+    background_analysis: str = Field(..., description="Overall assessment of background setting professionalism across all frames")
+    attire_percentage: float = Field(..., ge=0, le=100, description="Confidence (0–100) in attire being professional overall")
+    background_percentage: float = Field(..., ge=0, le=100, description="Confidence (0–100) in background being professional overall")
+    error: Optional[str] = Field(None, description="Error message if success is False")
 
 class AnalysisSummary(BaseModel):
     overall_success: bool
@@ -64,27 +61,8 @@ class AnalysisSummary(BaseModel):
     total_people_detected: int
     static_images_detected: int
 
-class AnalysisMethods(BaseModel):
-    camera_detection: str
-    visual_analysis_model: str
-    sampling_strategy: str
-    extraction_method: str
-
-class StaticDetection(BaseModel):
-    enabled: bool
-    method: str
-    ssim_threshold: float
-    landmark_threshold: float
-
-class Metadata(BaseModel):
-    analysis_timestamp: str
-    analysis_version: str
-    methods: AnalysisMethods
-    static_detection: StaticDetection
-
 class VideoAnalysisResponse(BaseModel):
     video_info: VideoInfo
     camera_analysis: CameraAnalysis
-    visual_intelligence: VisualIntelligence
+    attireAndBackgroundAnalysis: AttireAndBackgroundAnalysis
     analysis_summary: AnalysisSummary
-    metadata: Metadata
