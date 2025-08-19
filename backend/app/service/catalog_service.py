@@ -39,10 +39,17 @@ async def save_uploaded_file(db: AsyncSession, file: UploadFile) -> CatalogFile:
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
-
+    
+    # Get file size
+    file_size = len(content)
+    
     # Create database record
     catalog_file = CatalogFile(
-        filename=file.filename, file_path=str(file_path), status="uploaded"
+        filename=file.filename,
+        file_path=str(file_path),
+        size=file_size,
+        type=file.content_type or "application/octet-stream",
+        status="uploaded"
     )
 
     db.add(catalog_file)
@@ -57,19 +64,20 @@ async def get_all_files(db: AsyncSession) -> List[CatalogFile]:
     return list(result.scalars().all())
 
 
-async def index_catalog_files(db: AsyncSession):
+async def index_catalog_files(db: AsyncSession) -> List[CatalogFile]:
     # Get all uploaded files
     result = await db.execute(
         select(CatalogFile).where(CatalogFile.status == "uploaded")
     )
-    files = result.scalars().all()
-
+    files = list(result.scalars().all())
+    
     if not files:
-        return
-
+        return []
+    
     # Initialize indexer
     indexer = CourseCatalogIndexer()
-
+    indexed_files = []
+    
     for file in files:
         try:
             # Index single file with custom IDs
@@ -84,11 +92,17 @@ async def index_catalog_files(db: AsyncSession):
             setattr(file, "chunk_count", chunk_count)
             setattr(file, "indexed_at", datetime.now())
             await db.commit()
-
+            await db.refresh(file)
+            indexed_files.append(file)
+            
         except Exception as e:
             logger.error(f"Failed to index {getattr(file, 'filename')}: {e}")
             setattr(file, "status", "failed")
             await db.commit()
+            await db.refresh(file)
+            indexed_files.append(file)  # Include failed files in response too
+    
+    return indexed_files
 
 
 async def delete_catalog_file(db: AsyncSession, file_uid: str):
@@ -113,7 +127,7 @@ async def delete_catalog_file(db: AsyncSession, file_uid: str):
     await db.commit()
 
 
-async def unindex_catalog_file(db: AsyncSession, file_uid: str):
+async def unindex_catalog_file(db: AsyncSession, file_uid: UUID) -> CatalogFile:
     # Get file from database
     result = await db.execute(select(CatalogFile).where(CatalogFile.uid == file_uid))
     file = result.scalar_one_or_none()
@@ -135,3 +149,6 @@ async def unindex_catalog_file(db: AsyncSession, file_uid: str):
     setattr(file, "chunk_count", 0)
     setattr(file, "indexed_at", None)
     await db.commit()
+    await db.refresh(file)
+    
+    return file

@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { deleteCounselor } from "@/lib/services/counselors";
+import { deleteCounselor } from "@/lib/services/counselor-service";
 import { CounselorResponse } from "@/lib/types";
 
 interface DeleteCounselorDialogProps {

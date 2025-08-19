@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Menu, Search } from "lucide-react";
 import { AppSidebar } from "./app-sidebar";
+import { ThemeToggle } from "./theme-toggle";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 
@@ -51,6 +52,7 @@ export function AppHeader({ title = "Dashboard", showSearch = true }: AppHeaderP
 
         {/* User menu */}
         <div className="flex items-center space-x-4">
+          <ThemeToggle />
           <Avatar>
             <AvatarImage src="/avatars/user.png" alt="User" />
             <AvatarFallback>U</AvatarFallback>
