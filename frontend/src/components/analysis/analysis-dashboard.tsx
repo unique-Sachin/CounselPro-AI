@@ -13,6 +13,7 @@ import CourseAccuracyCard from "./course-accuracy-card";
 import PaymentVerificationCard from "./PaymentVerificationCard";
 import PressureAnalysisCard from "./PressureAnalysisCard";
 import OneOnOneCard from "./OneOnOneCard";
+import ParticipantsGrid from "./participants-grid";
 
 interface AnalysisDashboardProps {
   analysisData: SessionAnalysisResponse;
@@ -92,6 +93,16 @@ export default function AnalysisDashboard({ analysisData }: AnalysisDashboardPro
         <motion.div variants={cardVariants}>
           <OneOnOneCard videoAnalysisData={videoAnalysis} />
         </motion.div>
+      </motion.div>
+
+      {/* Participants Grid */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        className="mt-8"
+      >
+        <ParticipantsGrid videoAnalysisData={videoAnalysis} />
       </motion.div>
 
       {/* Additional Analysis Details */}
