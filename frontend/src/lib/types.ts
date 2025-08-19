@@ -9,13 +9,14 @@ export interface BaseModel {
 // Counselor types
 export interface CounselorResponse extends BaseModel {
   name: string;
-  specialty: string;
+  employee_id: string;
+  dept: string;
   email: string;
-  phone?: string;
+  mobile_number?: string;
   bio?: string;
   years_of_experience?: number;
   hourly_rate?: number;
-  availability_status: "available" | "busy" | "offline";
+  availability_status?: "available" | "busy" | "offline";
   rating?: number;
   total_sessions?: number;
 }
@@ -23,9 +24,9 @@ export interface CounselorResponse extends BaseModel {
 export interface CounselorCreate {
   name: string;
   employee_id: string;
-  specialty: string;
+  dept: string;
   email: string;
-  phone?: string;
+  mobile_number?: string;
   bio?: string;
   years_of_experience?: number;
   hourly_rate?: number;
@@ -34,9 +35,9 @@ export interface CounselorCreate {
 
 export interface CounselorUpdate {
   name?: string;
-  specialty?: string;
+  dept?: string;
   email?: string;
-  phone?: string;
+  mobile_number?: string;
   bio?: string;
   years_of_experience?: number;
   hourly_rate?: number;

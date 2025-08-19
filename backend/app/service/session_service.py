@@ -1,10 +1,15 @@
 import logging
+import json
 from uuid import UUID
+from app.service.session_analysis_service import create_or_update_session_analysis
+from app.schemas.session_analysis_schema import SessionAnalysisCreate
 from app.service.video_processing.video_processing import VideoProcessor
 
 # from service.video_processing.video_processing import VideoProcessor
 from app.service.audio_processing.deepgram_transcriber import DeepgramTranscriber
 from app.service.course_verification.course_verifier import CourseVerifier
+from app.service.raw_transcript_service import create_raw_transcript
+from app.schemas.raw_transcript_schema import RawTranscriptCreate
 from app.service.video_processing.video_extraction import VideoExtractor
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -71,7 +76,7 @@ async def create_session(
         )
 
 
-async def get_session_by_id(db: AsyncSession, session_uid: str) -> SessionResponse:
+async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionResponse:
     try:
         result = await db.execute(
             select(CounselingSession)
@@ -257,6 +262,7 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
     Background task to process video for a counseling session.
     This function runs asynchronously after session creation.
     """
+    extraction = None
     try:
         print(f"Starting video processing for session {session_uid}")
         sessionResponse = await get_session_by_id(db, session_uid)
@@ -266,72 +272,65 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
 
         # Initialize video processor
         video_processor = VideoProcessor()
-        results = await video_processor.analyze_video(extraction_data)
+        video_analysis_data = await video_processor.analyze_video(extraction_data)
 
         audio_path = extraction_data.get("audio_path")
+        transcript_data = None
+      
         # If transcription wasn't already done in video processing, do it here
         if audio_path:
             try:
                 print(f"Starting Deepgram transcription for audio: {audio_path}")
                 transcriber = DeepgramTranscriber()
-                transcript_path = transcriber.transcribe_chunk(audio_path, session_uid)
-                print(f"Transcription completed: {transcript_path}")
-                # Add transcript path to results
-                results["transcript_path"] = transcript_path
+                transcript_data = transcriber.transcribe_chunk(audio_path, str(session_uid))
+                print(f"Transcription completed successfully")
+                
+                # Save transcript to database
+                try:
+                    total_segments = len(transcript_data.get("utterances", []))
+                    transcript_create = RawTranscriptCreate(
+                        session_uid=str(session_uid),
+                        total_segments=total_segments,
+                        raw_transcript=transcript_data
+                    )
+                    
+                    saved_transcript = await create_raw_transcript(db, transcript_create)
+                    print(f"Transcript saved to database with UID: {saved_transcript.uid}")
+                    
+                except Exception as db_error:
+                    print(f"Warning: Failed to save transcript to database: {db_error}")
+                    
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
-                results["transcription_error"] = str(transcription_error)
 
         print(f"Video processing completed for session {session_uid}")
 
         # Verify course information if transcription was successful
-        if results.get("transcript_path"):
+        if transcript_data:
             try:
                 print(f"Starting course verification for session {session_uid}")
 
-                # Load transcript data
-                import json
-
-                with open(results["transcript_path"], "r", encoding="utf-8") as f:
-                    transcript_data = json.load(f)
-
+                # Use transcript data directly instead of loading from file
                 # Initialize course verifier
                 verifier = CourseVerifier()
 
                 # Verify course information
-                verification_result = verifier.verify_full_transcript(transcript_data)
+                audio_analysis_data = verifier.verify_full_transcript(transcript_data)
 
-                # Save verification results
-                from pathlib import Path
-
-                verification_dir = Path("assets/verification_results")
-                verification_dir.mkdir(parents=True, exist_ok=True)
-
-                verification_file = (
-                    verification_dir / f"verification_{session_uid}.json"
+                # Create or update session analysis with proper data format
+                session_analysis_create = SessionAnalysisCreate(
+                    session_uid=str(session_uid),
+                    video_analysis_data=video_analysis_data,
+                    audio_analysis_data=audio_analysis_data
                 )
-                with open(verification_file, "w", encoding="utf-8") as f:
-                    json.dump(verification_result, f, indent=2, ensure_ascii=False)
-
-                results["verification_path"] = str(verification_file)
-                results["accuracy_score"] = str(verification_result["accuracy_score"])
-                results["red_flags_count"] = str(len(verification_result["red_flags"]))
-
-                print(f"Course verification completed: {verification_file}")
-                print(f"Accuracy score: {verification_result['accuracy_score']:.2f}")
-
-                if verification_result["red_flags"]:
-                    print(
-                        f"⚠️  {len(verification_result['red_flags'])} red flags detected:"
-                    )
-                    for flag in verification_result["red_flags"]:
-                        print(f"   • {flag}")
+                
+                saved_analysis = await create_or_update_session_analysis(db, session_analysis_create)
+                print(f"Session analysis saved/updated with UID: {saved_analysis.uid}")
 
             except Exception as verification_error:
                 print(f"Warning: Course verification failed: {verification_error}")
-                results["verification_error"] = str(verification_error)
 
-        return results
+        return {"msg":"Audio/Video data analyzed successfully"}
 
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing
@@ -347,6 +346,7 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
         )
     finally:
             try:
-                extraction.cleanup()
+                if extraction:
+                    extraction.cleanup()
             except Exception as cleanup_error:
                 logger.warning(f"Error during cleanup: {cleanup_error}")

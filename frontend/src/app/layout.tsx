@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
+import { GlobalAnalysisOverlay } from "@/components/global-analysis-overlay";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
@@ -44,6 +45,9 @@ export default function RootLayout({
                 {children}
               </main>
             </div>
+
+            {/* Global Analysis Overlay */}
+            <GlobalAnalysisOverlay />
           </div>
         </Providers>
       </body>

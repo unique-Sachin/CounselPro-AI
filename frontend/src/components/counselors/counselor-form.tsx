@@ -25,7 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Loader2 } from "lucide-react";
-import { createCounselor, updateCounselor } from "@/lib/services/counselors";
+import { createCounselor, updateCounselor } from "@/lib/services/counselor-service";
 import { CounselorResponse, CounselorUpdate } from "@/lib/types";
 
 // Validation schema
@@ -53,10 +53,10 @@ export function CounselorForm({ children, counselor, mode = "create" }: Counselo
     resolver: zodResolver(counselorFormSchema),
     defaultValues: {
       name: counselor?.name || "",
-      employee_id: counselor?.uid?.split('-')[0].toUpperCase() || "",
-      dept: counselor?.specialty || "",
+      employee_id: counselor?.employee_id || "",
+      dept: counselor?.dept || "",
       email: counselor?.email || "",
-      mobile_number: counselor?.phone || "",
+      mobile_number: counselor?.mobile_number || "",
     },
   });
 
@@ -65,10 +65,10 @@ export function CounselorForm({ children, counselor, mode = "create" }: Counselo
     if (counselor) {
       form.reset({
         name: counselor.name,
-        employee_id: counselor.uid.split('-')[0].toUpperCase(),
-        dept: counselor.specialty,
+        employee_id: counselor.employee_id,
+        dept: counselor.dept,
         email: counselor.email,
-        mobile_number: counselor.phone || "",
+        mobile_number: counselor.mobile_number || "",
       });
     }
   }, [counselor, form]);
@@ -119,10 +119,10 @@ export function CounselorForm({ children, counselor, mode = "create" }: Counselo
     // Map form data to API expected format
     const counselorData = {
       name: data.name,
-      employee_id: data.employee_id, // Include employee_id from form
-      specialty: data.dept, // Map dept to specialty
+      employee_id: data.employee_id,
+      dept: data.dept,
       email: data.email,
-      phone: data.mobile_number, // Map mobile_number to phone
+      mobile_number: data.mobile_number,
       availability_status: "available" as const,
     };
 

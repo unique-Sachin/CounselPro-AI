@@ -79,6 +79,69 @@ async def get_analysis_by_session_uid(
     return result.scalar_one_or_none()
 
 
+async def create_or_update_session_analysis(
+    db: AsyncSession, session_analysis: SessionAnalysisCreate
+) -> SessionAnalysis:
+    """
+    Create a new session analysis or update existing one if it already exists.
+    This is an "upsert" operation.
+    """
+    # First get the session by its uid
+    stmt = select(CounselingSession).where(
+        CounselingSession.uid == session_analysis.session_uid
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise NotFoundException(details="Session not found")
+
+    # Check if analysis already exists for this session
+    stmt = select(SessionAnalysis).where(SessionAnalysis.session_id == session.id)
+    result = await db.execute(stmt)
+    existing_analysis = result.scalar_one_or_none()
+
+    if existing_analysis:
+        # Update existing analysis
+        existing_analysis.video_analysis_data = session_analysis.video_analysis_data
+        existing_analysis.audio_analysis_data = session_analysis.audio_analysis_data
+        # updated_at will be automatically set by SQLAlchemy onupdate
+        await db.commit()
+        await db.refresh(existing_analysis)
+        
+        # Reload with relationships
+        stmt = (
+            select(SessionAnalysis)
+            .options(
+                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+            )
+            .where(SessionAnalysis.id == existing_analysis.id)
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one()
+    else:
+        # Create new analysis
+        db_session_analysis = SessionAnalysis(
+            session_id=session.id,
+            video_analysis_data=session_analysis.video_analysis_data,
+            audio_analysis_data=session_analysis.audio_analysis_data,
+        )
+        db.add(db_session_analysis)
+        await db.commit()
+        await db.refresh(db_session_analysis)
+
+        # Reload with relationships
+        stmt = (
+            select(SessionAnalysis)
+            .options(
+                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+            )
+            .where(SessionAnalysis.id == db_session_analysis.id)
+        )
+        result = await db.execute(stmt)
+        return result.scalar_one()
+
+
 async def update_session_analysis(
     db: AsyncSession, uid: str, session_analysis: SessionAnalysisCreate
 ) -> Optional[SessionAnalysis]:
@@ -95,7 +158,7 @@ async def update_session_analysis(
     if db_analysis:
         db_analysis.video_analysis_data = session_analysis.video_analysis_data
         db_analysis.audio_analysis_data = session_analysis.audio_analysis_data
-        db_analysis.updated_at = datetime.utcnow()
+        # updated_at will be automatically set by SQLAlchemy onupdate
         await db.commit()
         await db.refresh(db_analysis)
     return db_analysis

@@ -204,31 +204,43 @@ Compare the transcript claims against the catalog information and provide analys
             # Extract all utterances text
             utterances = transcript_data.get('utterances', [])
             
-            # Combine all counselor utterances
+            # Combine ALL utterances regardless of role
+            all_text = []
             counselor_text = []
+            student_text = []
+            
             for utterance in utterances:
+                text = utterance.get('text', '')
+                all_text.append(text)
+                
+                # Still separate by role for metadata analysis
                 if utterance.get('role') == 'counselor':
-                    counselor_text.append(utterance.get('text', ''))
+                    counselor_text.append(text)
+                else:  # Assuming non-counselor is student
+                    student_text.append(text)
             
-            # Combine into text
-            full_counselor_text = ' '.join(counselor_text)
+            # Combine all text for verification
+            full_transcript_text = ' '.join(all_text)
             
-            if not full_counselor_text.strip():
+            if not full_transcript_text.strip():
                 return {
                     "courses_mentioned": [],
-                    "overall_summary": "No counselor utterances found for verification",
+                    "overall_summary": "No transcript content found for verification",
                     "accuracy_score": 0.0,
-                    "red_flags": ["No counselor content to verify"]
+                    "red_flags": ["No content to verify"]
                 }
             
-            # Verify the counselor text
-            result = self.verify_transcript_chunk(full_counselor_text)
+            # Verify the complete transcript (both counselor and student utterances)
+            result = self.verify_transcript_chunk(full_transcript_text)
             
-            # Add session metadata
+            # Add session metadata with role breakdown
             result['session_metadata'] = {
                 'session_id': transcript_data.get('session_id'),
                 'total_utterances': len(utterances),
-                'counselor_utterances': len(counselor_text)
+                'counselor_utterances': len(counselor_text),
+                'student_utterances': len(student_text),
+                'verification_scope': 'all_speakers',
+                'diarization_note': 'Course information verified from all participants to ensure accuracy'
             }
             
             return result

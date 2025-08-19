@@ -1,9 +1,10 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
+import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -13,9 +14,7 @@ import {
   Play,
   Volume2,
   BarChart3,
-  UserCheck,
-  CreditCard,
-  AlertTriangle
+  Loader2
 } from "lucide-react";
 
 import { PageTransition } from "@/components/page-transition";
@@ -25,13 +24,20 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TranscriptViewer from "@/components/transcript/transcript-viewer";
+import { useAnalysis } from "@/contexts/analysis-context";
+import { useNavigationLock } from "@/hooks/use-navigation-lock";
 
-import { getSession } from "@/lib/services/sessions";
+import { getSession, analyzeSession } from "@/lib/services/sessions";
+import AnalysisTab from "./analysis-tab";
 
 export default function SessionDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const sessionUid = params.uid as string;
+  const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
+
+  // Enable navigation lock when analysis is running
+  useNavigationLock();
 
   // Fetch session details
   const {
@@ -43,6 +49,38 @@ export default function SessionDetailsPage() {
     queryFn: () => getSession(sessionUid),
     enabled: !!sessionUid,
   });
+
+  // Analysis mutation
+  const analysisMutation = useMutation({
+    mutationFn: () => analyzeSession(sessionUid),
+    onMutate: () => {
+      // Set global analysis state when starting
+      setSessionUid(sessionUid);
+      setAnalysisSource('session-details');
+      setIsAnalyzing(true);
+    },
+    onSuccess: () => {
+      toast.success("Analysis Completed", {
+        description: "Session analysis has been completed successfully.",
+      });
+      // Release global lock
+      setIsAnalyzing(false);
+      setSessionUid(null);
+      setAnalysisSource(null);
+    },
+    onError: (error) => {
+      console.error("Analysis failed:", error);
+      toast.error("Analysis Failed", {
+        description: "Failed to analyze the session. Please try again.",
+      });
+      // Release global lock on error
+      setIsAnalyzing(false);
+      setSessionUid(null);
+      setAnalysisSource(null);
+    },
+  });
+
+  const isAnalyzing = analysisMutation.isPending || globalIsAnalyzing;
 
   const isAudioUrl = (url: string) => {
     return /\.(mp3|wav|ogg|m4a|aac|flac)(\?.*)?$/i.test(url) || url.includes("audio");
@@ -109,10 +147,16 @@ export default function SessionDetailsPage() {
 
   return (
     <PageTransition>
-      <div className="container max-w-6xl mx-auto py-6">
+      <div className={`container max-w-6xl mx-auto py-6 relative ${isAnalyzing ? 'pointer-events-none' : ''}`}>
         {/* Header */}
         <div className="mb-6">
-          <Button variant="ghost" size="sm" onClick={() => router.back()} className="mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => router.back()} 
+            className="mb-4"
+            disabled={isAnalyzing}
+          >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -133,9 +177,15 @@ export default function SessionDetailsPage() {
         >
           <Tabs defaultValue="details" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="details">Session Details</TabsTrigger>
-              <TabsTrigger value="transcript">Transcript</TabsTrigger>
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+              <TabsTrigger value="details" disabled={isAnalyzing}>
+                Session Details
+              </TabsTrigger>
+              <TabsTrigger value="transcript" disabled={isAnalyzing}>
+                Transcript
+              </TabsTrigger>
+              <TabsTrigger value="analysis" disabled={isAnalyzing}>
+                Analysis
+              </TabsTrigger>
             </TabsList>
 
             {/* Session Details Tab */}
@@ -232,114 +282,50 @@ export default function SessionDetailsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Analysis Action */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <BarChart3 className="h-4 w-4" />
+                      Session Analysis
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        onClick={() => analysisMutation.mutate()}
+                        disabled={isAnalyzing}
+                        className="flex items-center gap-2"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 className="h-4 w-4" />
+                            Analyse
+                          </>
+                        )}
+                      </Button>
+                      {isAnalyzing && (
+                        <span className="text-sm text-muted-foreground">
+                          Please wait while we analyze the session...
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Transcript Tab */}
             <TabsContent value="transcript" className="space-y-6">
-              <TranscriptViewer />
+              <TranscriptViewer sessionUid={sessionUid} />
             </TabsContent>
 
             {/* Analysis Tab */}
             <TabsContent value="analysis" className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Course Accuracy */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="h-5 w-5" />
-                      Course Accuracy
-                    </CardTitle>
-                    <CardDescription>
-                      Analysis of adherence to counseling protocols
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Analysis Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Course accuracy metrics will appear here after processing
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Payment Verification */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <CreditCard className="h-5 w-5" />
-                      Payment Verification
-                    </CardTitle>
-                    <CardDescription>
-                      Payment status and billing verification
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <CreditCard className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Verification Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Payment verification results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Pressure Analysis */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <AlertTriangle className="h-5 w-5" />
-                      Pressure Analysis
-                    </CardTitle>
-                    <CardDescription>
-                      Detection of inappropriate pressure tactics
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Analysis Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Pressure analysis results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* One-on-One Verification */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <UserCheck className="h-5 w-5" />
-                      One-on-One Verification
-                    </CardTitle>
-                    <CardDescription>
-                      Verification of proper counselor-client interaction
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <UserCheck className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Verification Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        One-on-one verification results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <AnalysisTab />
             </TabsContent>
           </Tabs>
         </motion.div>

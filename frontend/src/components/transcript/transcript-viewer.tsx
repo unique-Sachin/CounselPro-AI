@@ -1,15 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Upload, Clock } from "lucide-react";
-
+import { Search, Clock, FileText, Loader2, BarChart3 } from "lucide-react";
+import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { getRawTranscript, analyzeSession } from "@/lib/services/sessions";
+import { useAnalysis } from "@/contexts/analysis-context";
 
 // Types
 interface TranscriptUtterance {
@@ -37,7 +42,10 @@ interface TranscriptData {
   utterances: TranscriptUtterance[];
 }
 
+
+
 interface TranscriptViewerProps {
+  sessionUid: string;
   data?: TranscriptData;
 }
 
@@ -59,200 +67,77 @@ const formatTime = (timeString?: string) => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(2, '0')}`;
   }
   
-  return timeString;
+  return null;
 };
 
-const getSpeakerBadgeVariant = (role: string) => {
-  const normalizedRole = role.toLowerCase();
-  if (normalizedRole === 'counselor') {
-    return "default";
-  }
-  if (normalizedRole === 'student') {
-    return "secondary";
-  }
-  return "outline";
+const getBadgeVariant = (role: string) => {
+  if (role === 'counselor') return 'default';
+  if (role === 'student') return 'secondary';
+  return 'outline';
 };
 
-const DropzoneCard = ({ onFileUpload }: { onFileUpload: (data: TranscriptData) => void }) => {
-  const [isDragOver, setIsDragOver] = useState(false);
-
-  const handleFileUpload = useCallback((file: File) => {
-    if (file.type === "application/json") {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const jsonData = JSON.parse(e.target?.result as string);
-          
-          // Handle the new expected format with metadata and utterances
-          if (jsonData.metadata && jsonData.utterances && Array.isArray(jsonData.utterances)) {
-            onFileUpload(jsonData);
-          } 
-          // Handle legacy format - array of utterances
-          else if (Array.isArray(jsonData)) {
-            const legacyData: TranscriptData = {
-              metadata: {
-                chunk_name: "legacy-upload",
-                processing_time_seconds: 0,
-                timestamp: new Date().toISOString(),
-                role_mapping: { counselor: 0, student: 1 },
-                total_speakers: 2
-              },
-              utterances: jsonData.map((item: {speaker?: string; text?: string; start_time?: string; end_time?: string}, index: number) => ({
-                speaker: item.speaker === "Counselor" ? 0 : 1,
-                text: item.text || "",
-                start_time: item.start_time || `00:00:${String(index * 5).padStart(2, '0')}.00`,
-                end_time: item.end_time || `00:00:${String((index + 1) * 5).padStart(2, '0')}.00`,
-                confidence: 1.0,
-                role: item.speaker === "Counselor" ? "counselor" : "student"
-              }))
-            };
-            onFileUpload(legacyData);
-          }
-          // Handle legacy format with utterances array
-          else if (jsonData.utterances && Array.isArray(jsonData.utterances)) {
-            const legacyData: TranscriptData = {
-              metadata: {
-                chunk_name: "legacy-upload",
-                processing_time_seconds: 0,
-                timestamp: new Date().toISOString(),
-                role_mapping: { counselor: 0, student: 1 },
-                total_speakers: 2
-              },
-              utterances: jsonData.utterances.map((item: {speaker?: string; text?: string; start_time?: string; end_time?: string}, index: number) => ({
-                speaker: item.speaker === "Counselor" ? 0 : 1,
-                text: item.text || "",
-                start_time: item.start_time || `00:00:${String(index * 5).padStart(2, '0')}.00`,
-                end_time: item.end_time || `00:00:${String((index + 1) * 5).padStart(2, '0')}.00`,
-                confidence: 1.0,
-                role: item.speaker === "Counselor" ? "counselor" : "student"
-              }))
-            };
-            onFileUpload(legacyData);
-          }
-          // Handle Deepgram format  
-          else if (jsonData.results && Array.isArray(jsonData.results)) {
-            const deepgramData: TranscriptData = {
-              metadata: {
-                chunk_name: "deepgram-upload",
-                processing_time_seconds: 0,
-                timestamp: new Date().toISOString(),
-                role_mapping: { counselor: 0, student: 1 },
-                total_speakers: 2
-              },
-              utterances: jsonData.results.map((result: {
-                speaker?: string;
-                text?: string;
-                transcript?: string;
-                start?: number | string;
-                end?: number | string;
-              }, index: number) => ({
-                speaker: result.speaker === "Counselor" ? 0 : 1,
-                text: result.text || result.transcript || "",
-                start_time: result.start ? `00:00:${String(Math.floor(Number(result.start))).padStart(2, '0')}.${String(Math.floor((Number(result.start) % 1) * 100)).padStart(2, '0')}` : `00:00:${String(index * 5).padStart(2, '0')}.00`,
-                end_time: result.end ? `00:00:${String(Math.floor(Number(result.end))).padStart(2, '0')}.${String(Math.floor((Number(result.end) % 1) * 100)).padStart(2, '0')}` : `00:00:${String((index + 1) * 5).padStart(2, '0')}.00`,
-                confidence: 1.0,
-                role: result.speaker === "Counselor" ? "counselor" : "student"
-              }))
-            };
-            onFileUpload(deepgramData);
-          }
-          else {
-            throw new Error("Unrecognized format");
-          }
-        } catch (error) {
-          console.error("Failed to parse transcript JSON:", error);
-          alert("Invalid JSON format. Please upload a valid transcript file.");
-        }
-      };
-      reader.readAsText(file);
-    } else {
-      alert("Please select a JSON file.");
-    }
-  }, [onFileUpload]);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    
-    const files = Array.from(e.dataTransfer.files);
-    const jsonFile = files.find(file => file.type === "application/json");
-    
-    if (jsonFile) {
-      handleFileUpload(jsonFile);
-    }
-  }, [handleFileUpload]);
-
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileUpload(file);
-    }
-  }, [handleFileUpload]);
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5" />
-          Upload Transcript
-        </CardTitle>
-        <CardDescription>
-          Drop a JSON file or click to upload a transcript
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragOver
-              ? 'border-primary bg-primary/5'
-              : 'border-muted-foreground/25 hover:border-muted-foreground/50'
-          }`}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={handleDrop}
-        >
-          <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-lg font-medium mb-2">
-            Drop your transcript file here
-          </p>
-          <p className="text-muted-foreground mb-4">
-            Supports JSON format with utterances array
-          </p>
-          <div className="flex items-center justify-center">
-            <Input
-              type="file"
-              accept=".json"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="transcript-upload"
-            />
-            <Button asChild>
-              <label htmlFor="transcript-upload" className="cursor-pointer">
-                Choose File
-              </label>
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground mt-2">
-            Expected format: {`{metadata: {...}, utterances: [{speaker: 0, text: "Hello...", start_time: "00:00:04.08", end_time: "00:00:04.80", role: "counselor"}]}`}
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-export default function TranscriptViewer({ data }: TranscriptViewerProps) {
-  const [transcriptData, setTranscriptData] = useState<TranscriptData | undefined>(data);
+export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnlyCounselor, setShowOnlyCounselor] = useState(false);
+  const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
 
-  const utterances = transcriptData?.utterances || [];
+  // Fetch transcript data from API
+  const {
+    data: transcriptResponse,
+    isLoading,
+    error,
+    isFetching,
+    refetch: refetchTranscript,
+  } = useQuery({
+    queryKey: ["raw-transcript", sessionUid],
+    queryFn: () => getRawTranscript(sessionUid),
+    enabled: !!sessionUid,
+    retry: 1, // Only retry once for transcript fetching
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+  });
+
+  // Analysis mutation
+  const analysisMutation = useMutation({
+    mutationFn: () => analyzeSession(sessionUid),
+    onMutate: () => {
+      // Set global analysis state when starting
+      setSessionUid(sessionUid);
+      setAnalysisSource('transcript-tab');
+      setIsAnalyzing(true);
+    },
+    onSuccess: () => {
+      toast.success("Analysis Completed", {
+        description: "Session analysis has been completed successfully. Fetching transcript...",
+      });
+      // Refetch transcript data after successful analysis
+      setTimeout(() => {
+        refetchTranscript();
+      }, 3000); // Wait 3 seconds for analysis to process and generate transcript
+      // Release global lock
+      setIsAnalyzing(false);
+      setSessionUid(null);
+      setAnalysisSource(null);
+    },
+    onError: (error) => {
+      console.error("Analysis failed:", error);
+      toast.error("Analysis Failed", {
+        description: "Failed to analyze the session. Please try again.",
+      });
+      // Release global lock on error
+      setIsAnalyzing(false);
+      setSessionUid(null);
+      setAnalysisSource(null);
+    },
+  });
+
+  const isAnalyzing = analysisMutation.isPending || globalIsAnalyzing;
+
+  // Extract transcript data from API response or use passed data (for backward compatibility)  
+  const currentData = transcriptResponse?.raw_transcript || data;
+  const utterances = currentData?.utterances || [];
 
   // Filter utterances based on search and counselor toggle
-  const filteredUtterances = utterances.filter((utterance) => {
+  const filteredUtterances = utterances.filter((utterance: TranscriptUtterance) => {
     const matchesSearch = searchQuery
       ? utterance.text.toLowerCase().includes(searchQuery.toLowerCase()) ||
         utterance.role.toLowerCase().includes(searchQuery.toLowerCase())
@@ -265,119 +150,347 @@ export default function TranscriptViewer({ data }: TranscriptViewerProps) {
     return matchesSearch && matchesCounselorFilter;
   });
 
-  // If no data provided and no uploaded data, show dropzone
-  if (!transcriptData) {
-    return <DropzoneCard onFileUpload={setTranscriptData} />;
+  // Show loading state while fetching transcript
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="space-y-6"
+      >
+        {/* Controls Skeleton */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading Transcript
+            </CardTitle>
+            <CardDescription>
+              Fetching session transcript...
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Search bar skeleton */}
+            <Skeleton className="h-10 w-full" />
+            
+            {/* Toggle skeleton */}
+            <div className="flex items-center space-x-2">
+              <Skeleton className="h-5 w-10" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+            
+            {/* Stats skeleton */}
+            <Skeleton className="h-4 w-48" />
+          </CardContent>
+        </Card>
+
+        {/* Transcript Content Skeleton */}
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <Skeleton className="h-6 w-32" />
+            </CardTitle>
+            <CardDescription>
+              <Skeleton className="h-4 w-96" />
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6 max-h-[600px] overflow-y-auto">
+              {[...Array(8)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.1 }}
+                  className="space-y-3"
+                >
+                  {/* Speaker badge and timestamp skeleton */}
+                  <div className="flex items-center gap-2">
+                    <Skeleton className="h-6 w-20" /> {/* Badge */}
+                    <Skeleton className="h-4 w-16" /> {/* Time */}
+                    <Skeleton className="h-4 w-24" /> {/* Confidence */}
+                  </div>
+                  
+                  {/* Message text skeleton */}
+                  <div className="pl-4 border-l-2 border-l-muted space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                    {i % 3 === 0 && <Skeleton className="h-4 w-1/2" />} {/* Vary lengths */}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show analyzing overlay when analysis is running
+  if (isAnalyzing) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="relative"
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Analyzing Session
+            </CardTitle>
+            <CardDescription>
+              Please wait while we analyze the session and generate transcript...
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <motion.div 
+              className="text-center py-16"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <motion.div 
+                className="mx-auto w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                <BarChart3 className="w-12 h-12 text-primary" />
+              </motion.div>
+              <motion.div 
+                className="space-y-3"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <h3 className="text-xl font-semibold">Analysis in Progress</h3>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  We&apos;re analyzing the session content to generate insights and transcript. 
+                  This may take a few minutes.
+                </p>
+                <motion.div 
+                  className="flex items-center justify-center gap-2 mt-4"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.5 }}
+                >
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm text-muted-foreground">Processing...</span>
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show error state if fetch failed (optional, can be removed to show placeholder instead)
+  if (error) {
+    console.warn("Transcript fetch failed:", error);
+  }
+
+  // If no data available (either failed to fetch or no transcript exists), show placeholder
+  if (!currentData) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Transcript
+            </CardTitle>
+            <CardDescription>
+              Session transcript will appear here after analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <motion.div 
+              className="text-center py-12"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              <motion.div 
+                className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 0.3, delay: 0.2 }}
+              >
+                <FileText className="w-12 h-12 text-muted-foreground" />
+              </motion.div>
+              <motion.div 
+                className="space-y-4"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.3 }}
+              >
+                <h3 className="text-lg font-semibold">Transcript not available yet</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto">
+                  Please analyse the session to view transcript.
+                </p>
+                
+                {/* Analyse Button */}
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: 0.4 }}
+                >
+                  <Button 
+                    onClick={() => analysisMutation.mutate()}
+                    disabled={isAnalyzing}
+                    className="flex items-center gap-2"
+                    size="lg"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart3 className="h-4 w-4" />
+                        Analyse
+                      </>
+                    )}
+                  </Button>
+                  {isAnalyzing && (
+                    <motion.p 
+                      className="text-sm text-muted-foreground mt-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      Please wait while we analyze the session...
+                    </motion.p>
+                  )}
+                </motion.div>
+              </motion.div>
+            </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <motion.div 
+      className={`space-y-6 ${isLoading || isAnalyzing ? 'pointer-events-none' : ''}`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       {/* Controls */}
-      <Card>
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+      >
+        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Transcript Viewer
+            <FileText className="h-5 w-5" />
+            Transcript Controls
+            {(isFetching && !isLoading) || isAnalyzing ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : null}
           </CardTitle>
-          <CardDescription>
-            {utterances.length} utterances loaded
-          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Search Input */}
+          {/* Search */}
           <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
             <Input
               placeholder="Search transcript..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8"
+              className="pl-10"
             />
           </div>
 
-          {/* Filters */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="counselor-only"
-                checked={showOnlyCounselor}
-                onCheckedChange={setShowOnlyCounselor}
-              />
-              <Label htmlFor="counselor-only" className="text-sm">
-                Show only Counselor
-              </Label>
-            </div>
+          {/* Filter Toggle */}
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="counselor-only"
+              checked={showOnlyCounselor}
+              onCheckedChange={setShowOnlyCounselor}
+            />
+            <Label htmlFor="counselor-only">Show only counselor</Label>
+          </div>
 
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <span>
-                Showing {filteredUtterances.length} of {utterances.length}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setTranscriptData(undefined)}
-                className="h-8"
-              >
-                <Upload className="h-3 w-3 mr-1" />
-                Upload New
-              </Button>
-            </div>
+          {/* Stats */}
+          <div className="text-sm text-muted-foreground">
+            {filteredUtterances.length} of {utterances.length} utterances
+            {searchQuery && ` matching "${searchQuery}"`}
           </div>
         </CardContent>
       </Card>
+      </motion.div>
 
-      {/* Transcript List */}
-      <Card>
-        <CardContent className="p-0">
+      {/* Transcript Content */}
+      <motion.div
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4, delay: 0.2 }}
+      >
+        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            Conversation
+            {(isFetching && !isLoading) || isAnalyzing ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : null}
+          </CardTitle>
+          {(currentData as TranscriptData)?.metadata && (
+            <CardDescription>
+              Processed: {new Date((currentData as TranscriptData).metadata.timestamp).toLocaleString()} • 
+              {(currentData as TranscriptData).metadata.total_speakers} speakers • 
+              {Math.round((currentData as TranscriptData).metadata.processing_time_seconds)}s processing time
+            </CardDescription>
+          )}
+        </CardHeader>
+        <CardContent>
           {filteredUtterances.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <Search className="mx-auto h-12 w-12 mb-4 text-muted-foreground/50" />
-              <p>No utterances match your filters.</p>
+              {searchQuery ? `No utterances found matching "${searchQuery}"` : "No utterances to display"}
             </div>
           ) : (
-            <div className="max-h-[600px] overflow-y-auto">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto">
               <AnimatePresence>
-                {filteredUtterances.map((utterance, index) => (
+                {filteredUtterances.map((utterance: TranscriptUtterance, index: number) => (
                   <motion.div
-                    key={`${utterance.speaker}-${index}`}
+                    key={index}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -20 }}
                     transition={{ duration: 0.2, delay: index * 0.02 }}
-                    className="border-b last:border-b-0 p-4 hover:bg-muted/30 transition-colors"
+                    className="space-y-2"
                   >
-                    <div className="flex items-start gap-3">
-                      {/* Speaker Badge */}
-                      <Badge 
-                        variant={getSpeakerBadgeVariant(utterance.role)}
-                        className="shrink-0 min-w-fit capitalize"
-                      >
-                        {utterance.role}
+                    <div className="flex items-center gap-2 text-sm">
+                      <Badge variant={getBadgeVariant(utterance.role)}>
+                        {utterance.role.charAt(0).toUpperCase() + utterance.role.slice(1)}
                       </Badge>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm leading-relaxed break-words">
-                          {utterance.text}
-                        </p>
-
-                        {/* Timestamps */}
-                        {(utterance.start_time || utterance.end_time) && (
-                          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            {utterance.start_time && (
-                              <span>{formatTime(utterance.start_time)}</span>
-                            )}
-                            {utterance.start_time && utterance.end_time && (
-                              <span>-</span>
-                            )}
-                            {utterance.end_time && (
-                              <span>{formatTime(utterance.end_time)}</span>
-                            )}
-                          </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        <span>{formatTime(utterance.start_time)}</span>
+                        {utterance.confidence && (
+                          <span className="ml-2">
+                            {Math.round(utterance.confidence * 100)}% confidence
+                          </span>
                         )}
                       </div>
                     </div>
+                    <p className="text-sm leading-relaxed pl-4 border-l-2 border-l-muted">
+                      {utterance.text}
+                    </p>
+                    {index < filteredUtterances.length - 1 && <Separator className="my-4" />}
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -385,6 +498,7 @@ export default function TranscriptViewer({ data }: TranscriptViewerProps) {
           )}
         </CardContent>
       </Card>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

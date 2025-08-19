@@ -11,16 +11,17 @@ import {
   CatalogFile
 } from "@/lib/services/catalog";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, FileText, File, Trash2, Calendar, HardDrive } from "lucide-react";
+import { Upload, FileText, File, Trash2, Calendar, HardDrive, Loader2 } from "lucide-react";
 
 import { PageTransition } from "@/components/page-transition";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 
 // Types
-type FileStatus = "uploaded" | "indexed";
+type FileStatus = "uploaded" | "indexed" | "failed";
 type UploadedFile = CatalogFile;
 
 const ACCEPTED_FILE_TYPES = {
@@ -40,7 +41,6 @@ const formatFileSize = (bytes: number): string => {
 };
 
 const getFileIcon = (type: string) => {
-    console.log(type)
   if (type === 'application/pdf') return '📄';
   if (type.includes('word') || type.includes('document')) return '📝';
   if (type === 'text/plain') return '📋';
@@ -49,7 +49,6 @@ const getFileIcon = (type: string) => {
 };
 
 const getFileTypeLabel = (type: string) => {
-    console.log(type)
   if (type === 'application/pdf') return 'PDF';
   if (type.includes('word') || type.includes('document')) return 'DOCX';
   if (type === 'text/plain') return 'TXT';
@@ -57,19 +56,27 @@ const getFileTypeLabel = (type: string) => {
   return type.split('/')[1]?.toUpperCase() || 'FILE';
 };
 
-const getStatusBadgeVariant = (status: FileStatus): "default" | "secondary" | "destructive" | "outline" => {
-  return status === 'indexed' ? 'default' : 'secondary';
+const getStatusBadgeVariant = (status: FileStatus, isIndexing?: boolean): "default" | "secondary" | "destructive" | "outline" => {
+  if (isIndexing) return 'outline';
+  if (status === 'indexed') return 'default';
+  if (status === 'failed') return 'destructive';
+  return 'secondary';
 };
 
-const getStatusLabel = (status: FileStatus) => {
-  return status === 'indexed' ? 'Indexed' : 'Uploaded';
+const getStatusLabel = (status: FileStatus, isIndexing?: boolean) => {
+  if (isIndexing) return 'Indexing...';
+  if (status === 'indexed') return 'Indexed';
+  if (status === 'failed') return 'Failed';
+  return 'Uploaded';
 };
 
 export default function CatalogsPage() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-  // Removed unused loading state
   const [isDragOver, setIsDragOver] = useState(false);
   const [indexing, setIndexing] = useState(false);
+  const [indexingProgress, setIndexingProgress] = useState(0);
+  const [indexingFiles, setIndexingFiles] = useState<Set<string>>(new Set());
+  const [indexingFileStatus, setIndexingFileStatus] = useState<Record<string, 'indexing' | 'completed' | 'failed'>>({});
   // Fetch files on mount
   useEffect(() => {
     listCatalogFiles()
@@ -83,28 +90,94 @@ export default function CatalogsPage() {
   }, []);
 
   
-console.log(uploadedFiles)
  
 
-  // Index All handler
-  const handleIndexAll = useCallback(() => {
+  // Index All handler with progress tracking
+  const handleIndexAll = useCallback(async () => {
+    const filesToIndex = uploadedFiles.filter(f => f.status === "uploaded");
+    if (filesToIndex.length === 0) return;
+
     setIndexing(true);
-    toast.promise(
-      indexAllCatalogFiles(),
-      {
-        loading: "Indexing files...",
-        success: (files) => {
-          setUploadedFiles(files);
-          setIndexing(false);
-          return "All uploaded files have been indexed";
-        },
-        error: (err) => {
-          setIndexing(false);
-          return err?.message || "Failed to index files";
+    setIndexingProgress(0);
+    setIndexingFileStatus({});
+    
+    // Initialize indexing status for all files
+    const initialStatus: Record<string, 'indexing' | 'completed' | 'failed'> = {};
+    filesToIndex.forEach(file => {
+      initialStatus[file.uid] = 'indexing';
+    });
+    setIndexingFileStatus(initialStatus);
+    setIndexingFiles(new Set(filesToIndex.map(f => f.uid)));
+
+    let progressInterval: NodeJS.Timeout | null = null;
+
+    try {
+      // Simulate progressive indexing (since we don't have streaming API)
+      let completed = 0;
+      const total = filesToIndex.length;
+
+      // Start the actual indexing
+      const indexPromise = indexAllCatalogFiles();
+      
+      // Simulate progress updates
+      progressInterval = setInterval(() => {
+        completed += 1;
+        const progress = Math.min((completed / total) * 80, 80); // Cap at 80% until real completion
+        setIndexingProgress(progress);
+        
+        if (completed < total) {
+          // Update individual file status
+          const currentFile = filesToIndex[completed - 1];
+          if (currentFile) {
+            setIndexingFileStatus(prev => ({
+              ...prev,
+              [currentFile.uid]: 'completed'
+            }));
+          }
         }
-      }
-    );
-  }, []);
+      }, Math.max(500, 2000 / total)); // Adjust timing based on number of files
+
+      // Wait for actual API response
+      const indexedFiles = await indexPromise;
+      
+      // Clear interval and finalize
+      if (progressInterval) clearInterval(progressInterval);
+      setIndexingProgress(100);
+      
+      // Update all files as completed
+      const finalStatus: Record<string, 'indexing' | 'completed' | 'failed'> = {};
+      indexedFiles.forEach(file => {
+        finalStatus[file.uid] = 'completed';
+      });
+      setIndexingFileStatus(finalStatus);
+
+      // Merge the indexed files with the existing files list
+      setUploadedFiles(prev => 
+        prev.map(file => {
+          const indexedFile = indexedFiles.find(indexed => indexed.uid === file.uid);
+          return indexedFile || file;
+        })
+      );
+
+      // Clean up after a short delay
+      setTimeout(() => {
+        setIndexing(false);
+        setIndexingProgress(0);
+        setIndexingFiles(new Set());
+        setIndexingFileStatus({});
+      }, 1000);
+
+      toast.success("All uploaded files have been indexed");
+
+    } catch (error) {
+      if (progressInterval) clearInterval(progressInterval);
+      setIndexing(false);
+      setIndexingProgress(0);
+      setIndexingFiles(new Set());
+      setIndexingFileStatus({});
+      toast.error((error as Error)?.message || "Failed to index files");
+    }
+  }, [uploadedFiles]);
 
   const handleFileUpload = useCallback((files: File[]) => {
     const validFiles = files.filter(file => 
@@ -194,11 +267,39 @@ console.log(uploadedFiles)
             size="sm"
             disabled={!uploadedFiles || uploadedFiles.filter(f => f.status === "uploaded").length === 0 || indexing}
             onClick={handleIndexAll}
-            className="mt-4 sm:mt-0"
+            className="mt-4 sm:mt-0 flex items-center gap-2"
           >
+            {indexing && <Loader2 className="h-4 w-4 animate-spin" />}
             Index All
           </Button>
         </div>
+        
+        {/* Progress Bar Section */}
+        {indexing && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-6"
+          >
+            <Card>
+              <CardContent className="pt-6">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-medium">Indexing Progress</h3>
+                    <span className="text-sm text-muted-foreground">
+                      {Math.round(indexingProgress)}%
+                    </span>
+                  </div>
+                  <Progress value={indexingProgress} className="w-full" />
+                  <p className="text-sm text-muted-foreground">
+                    Processing {uploadedFiles.filter(f => f.status === "uploaded").length} files...
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
         <div className="space-y-6">
           {/* File Upload Card */}
           <motion.div
@@ -271,7 +372,7 @@ console.log(uploadedFiles)
                     Uploaded Files ({uploadedFiles.length})
                   </CardTitle>
                   <CardDescription>
-                    Manage your uploaded documents • {uploadedFiles.filter(f => f.status === 'indexed').length} indexed, {uploadedFiles.filter(f => f.status === 'uploaded').length} uploaded
+                    Manage your uploaded documents • {uploadedFiles.filter(f => f.status === 'indexed').length} indexed, {uploadedFiles.filter(f => f.status === 'uploaded').length} uploaded, {uploadedFiles.filter(f => f.status === 'failed').length} failed
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -289,9 +390,9 @@ console.log(uploadedFiles)
                         >
                           <div className="flex items-center gap-3 flex-1 min-w-0">
                             {/* File Icon */}
-                            {/* <div className="text-2xl shrink-0">
+                            <div className="text-2xl shrink-0">
                               {getFileIcon(file.type)}
-                            </div> */}
+                            </div>
                             
                             {/* File Info */}
                             <div className="flex-1 min-w-0">
@@ -299,22 +400,25 @@ console.log(uploadedFiles)
                                 <p className="font-medium truncate" title={file.filename}>
                                   {file.filename}
                                 </p>
-                                {/* <Badge variant="outline" className="shrink-0">
+                                <Badge variant="outline" className="shrink-0">
                                   {getFileTypeLabel(file.type)}
-                                </Badge> */}
+                                </Badge>
                                 <Badge 
-                                  variant={getStatusBadgeVariant(file.status)} 
-                                  className="shrink-0"
+                                  variant={getStatusBadgeVariant(file.status, indexingFiles.has(file.uid))} 
+                                  className="shrink-0 flex items-center gap-1"
                                 >
-                                  {getStatusLabel(file.status)}
+                                  {indexingFiles.has(file.uid) && indexingFileStatus[file.uid] === 'indexing' && (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  )}
+                                  {getStatusLabel(file.status, indexingFiles.has(file.uid))}
                                 </Badge>
                               </div>
                               
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                {/* <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1">
                                   <HardDrive className="h-3 w-3" />
                                   <span>{formatFileSize(file.size)}</span>
-                                </div> */}
+                                </div>
                                 <div className="flex items-center gap-1">
                                   <Calendar className="h-3 w-3" />
                                   <span>{new Date(file.uploaded_at).toLocaleDateString()}</span>
@@ -336,7 +440,7 @@ console.log(uploadedFiles)
                                 Unindex
                               </Button>
                             )}
-                            {/* Delete Button - Only enabled for uploaded files */}
+                            {/* Delete Button - Only enabled for uploaded and failed files */}
                             <Button
                               variant="ghost"
                               size="sm"

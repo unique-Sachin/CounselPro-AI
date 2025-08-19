@@ -55,7 +55,7 @@ async def list_all_sessions(
 
 @router.get("/{session_uid}", response_model=SessionResponse)
 async def get_counseling_session(
-    session_uid: str, db: AsyncSession = Depends(get_async_db)
+    session_uid: UUID, db: AsyncSession = Depends(get_async_db)
 ):
     return await get_session_by_id(db, session_uid)
 
