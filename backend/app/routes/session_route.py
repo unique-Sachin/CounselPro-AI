@@ -101,3 +101,20 @@ async def get_session_analysis(
 ):
     results = await process_video_background(db, session_id)
     return results
+
+
+@router.get("/{session_uid}/analysis_by_celery")
+async def get_session_analysis_using_celery_background_task(
+    session_uid: str, db: AsyncSession = Depends(get_async_db)
+):
+    print(f"Starting video processing for session {session_uid}")
+    sessionResponse = await get_session_by_id(db, session_uid)
+
+    video_path = sessionResponse.recording_link
+
+    if not video_path:
+        return {"error": "Video path not found"}
+
+    # Send task to Celery worker
+    task = process_video.delay(db, session_uid, video_path)
+    return {"task_id": task.id, "status": "Processing started"}
