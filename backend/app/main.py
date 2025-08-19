@@ -19,6 +19,10 @@ import logging
 from fastapi.middleware.cors import CORSMiddleware
 from app.config.log_config import get_logger
 from app.service.email_service import test_email_sending, test_modern_email_template
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # Initialize logger
 logger = get_logger("CounselPro")

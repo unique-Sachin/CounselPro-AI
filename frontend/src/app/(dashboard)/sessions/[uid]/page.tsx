@@ -14,9 +14,6 @@ import {
   Play,
   Volume2,
   BarChart3,
-  UserCheck,
-  CreditCard,
-  AlertTriangle,
   Loader2
 } from "lucide-react";
 
@@ -31,6 +28,7 @@ import { useAnalysis } from "@/contexts/analysis-context";
 import { useNavigationLock } from "@/hooks/use-navigation-lock";
 
 import { getSession, analyzeSession } from "@/lib/services/sessions";
+import AnalysisTab from "./analysis-tab";
 
 export default function SessionDetailsPage() {
   const params = useParams();
@@ -150,22 +148,6 @@ export default function SessionDetailsPage() {
   return (
     <PageTransition>
       <div className={`container max-w-6xl mx-auto py-6 relative ${isAnalyzing ? 'pointer-events-none' : ''}`}>
-        {/* Analysis Loading Overlay */}
-        {isAnalyzing && (
-          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center">
-            <div className="bg-card border rounded-lg p-6 shadow-lg">
-              <div className="flex items-center gap-3">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <div>
-                  <p className="font-medium">Analyzing Session</p>
-                  <p className="text-sm text-muted-foreground">
-                    Please wait while we process the session data...
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
         {/* Header */}
         <div className="mb-6">
           <Button 
@@ -343,103 +325,7 @@ export default function SessionDetailsPage() {
 
             {/* Analysis Tab */}
             <TabsContent value="analysis" className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                {/* Course Accuracy */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <BarChart3 className="h-5 w-5" />
-                      Course Accuracy
-                    </CardTitle>
-                    <CardDescription>
-                      Analysis of adherence to counseling protocols
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <BarChart3 className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Analysis Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Course accuracy metrics will appear here after processing
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Payment Verification */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <CreditCard className="h-5 w-5" />
-                      Payment Verification
-                    </CardTitle>
-                    <CardDescription>
-                      Payment status and billing verification
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <CreditCard className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Verification Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Payment verification results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Pressure Analysis */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <AlertTriangle className="h-5 w-5" />
-                      Pressure Analysis
-                    </CardTitle>
-                    <CardDescription>
-                      Detection of inappropriate pressure tactics
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <AlertTriangle className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Analysis Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        Pressure analysis results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* One-on-One Verification */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <UserCheck className="h-5 w-5" />
-                      One-on-One Verification
-                    </CardTitle>
-                    <CardDescription>
-                      Verification of proper counselor-client interaction
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-center py-8">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                        <UserCheck className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                      <p className="text-muted-foreground mb-2">Verification Pending</p>
-                      <p className="text-xs text-muted-foreground">
-                        One-on-one verification results will appear here
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+              <AnalysisTab />
             </TabsContent>
           </Tabs>
         </motion.div>

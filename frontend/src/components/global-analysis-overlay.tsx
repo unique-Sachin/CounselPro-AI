@@ -7,8 +7,8 @@ import { useAnalysis } from "@/contexts/analysis-context";
 export function GlobalAnalysisOverlay() {
   const { isAnalyzing, analysisSource } = useAnalysis();
 
-  // Only show overlay for transcript-tab analysis, not session-details
-  const shouldShowOverlay = isAnalyzing && analysisSource === 'transcript-tab';
+  // Show overlay for both transcript-tab and session-details analysis
+  const shouldShowOverlay = isAnalyzing && (analysisSource === 'transcript-tab' || analysisSource === 'session-details');
 
   return (
     <AnimatePresence>
@@ -43,8 +43,10 @@ export function GlobalAnalysisOverlay() {
                 <div className="space-y-3">
                   <h2 className="text-xl font-semibold">Session Analysis in Progress</h2>
                   <p className="text-muted-foreground text-sm leading-relaxed">
-                    We&apos;re analyzing the session content to generate insights and transcript. 
-                    Please wait while this process completes.
+                    {analysisSource === 'session-details' 
+                      ? "We're analyzing the session content to generate comprehensive insights and reports. Please wait while this process completes."
+                      : "We're analyzing the session content to generate insights and transcript. Please wait while this process completes."
+                    }
                   </p>
                 </div>
 

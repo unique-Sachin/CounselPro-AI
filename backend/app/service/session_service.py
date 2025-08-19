@@ -1,6 +1,8 @@
 import logging
 import json
 from uuid import UUID
+from app.service.session_analysis_service import create_or_update_session_analysis
+from app.schemas.session_analysis_schema import SessionAnalysisCreate
 from app.service.video_processing.video_processing import VideoProcessor
 
 # from service.video_processing.video_processing import VideoProcessor
@@ -260,6 +262,7 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
     Background task to process video for a counseling session.
     This function runs asynchronously after session creation.
     """
+    extraction = None
     try:
         print(f"Starting video processing for session {session_uid}")
         sessionResponse = await get_session_by_id(db, session_uid)
@@ -269,11 +272,11 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
 
         # Initialize video processor
         video_processor = VideoProcessor()
-        results = await video_processor.analyze_video(extraction_data)
+        video_analysis_data = await video_processor.analyze_video(extraction_data)
 
         audio_path = extraction_data.get("audio_path")
         transcript_data = None
-        
+      
         # If transcription wasn't already done in video processing, do it here
         if audio_path:
             try:
@@ -293,16 +296,12 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
                     
                     saved_transcript = await create_raw_transcript(db, transcript_create)
                     print(f"Transcript saved to database with UID: {saved_transcript.uid}")
-                    results["transcript_saved"] = True
-                    results["transcript_uid"] = saved_transcript.uid
                     
                 except Exception as db_error:
                     print(f"Warning: Failed to save transcript to database: {db_error}")
-                    results["transcript_db_error"] = str(db_error)
                     
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
-                results["transcription_error"] = str(transcription_error)
 
         print(f"Video processing completed for session {session_uid}")
 
@@ -316,39 +315,22 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
                 verifier = CourseVerifier()
 
                 # Verify course information
-                verification_result = verifier.verify_full_transcript(transcript_data)
+                audio_analysis_data = verifier.verify_full_transcript(transcript_data)
 
-                # Save verification results
-                from pathlib import Path
-
-                verification_dir = Path("assets/verification_results")
-                verification_dir.mkdir(parents=True, exist_ok=True)
-
-                verification_file = (
-                    verification_dir / f"verification_{session_uid}.json"
+                # Create or update session analysis with proper data format
+                session_analysis_create = SessionAnalysisCreate(
+                    session_uid=str(session_uid),
+                    video_analysis_data=video_analysis_data,
+                    audio_analysis_data=audio_analysis_data
                 )
-                with open(verification_file, "w", encoding="utf-8") as f:
-                    json.dump(verification_result, f, indent=2, ensure_ascii=False)
-
-                results["verification_path"] = str(verification_file)
-                results["accuracy_score"] = str(verification_result["accuracy_score"])
-                results["red_flags_count"] = str(len(verification_result["red_flags"]))
-
-                print(f"Course verification completed: {verification_file}")
-                print(f"Accuracy score: {verification_result['accuracy_score']:.2f}")
-
-                if verification_result["red_flags"]:
-                    print(
-                        f"⚠️  {len(verification_result['red_flags'])} red flags detected:"
-                    )
-                    for flag in verification_result["red_flags"]:
-                        print(f"   • {flag}")
+                
+                saved_analysis = await create_or_update_session_analysis(db, session_analysis_create)
+                print(f"Session analysis saved/updated with UID: {saved_analysis.uid}")
 
             except Exception as verification_error:
                 print(f"Warning: Course verification failed: {verification_error}")
-                results["verification_error"] = str(verification_error)
 
-        return results
+        return {"msg":"Audio/Video data analyzed successfully"}
 
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing
@@ -364,6 +346,7 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
         )
     finally:
             try:
-                extraction.cleanup()
+                if extraction:
+                    extraction.cleanup()
             except Exception as cleanup_error:
                 logger.warning(f"Error during cleanup: {cleanup_error}")
