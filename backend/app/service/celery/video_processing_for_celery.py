@@ -230,3 +230,78 @@ def create_raw_transcript(
             details=str(e),
             status_code=500,
         )
+
+
+def create_or_update_raw_transcript(
+    db: Session, transcript_in: RawTranscriptCreate
+) -> RawTranscriptResponse:
+    try:
+        # Find session by UID
+        result = db.execute(
+            select(CounselingSession)
+            .options(joinedload(CounselingSession.counselor))
+            .where(CounselingSession.uid == transcript_in.session_uid)
+        )
+        session = result.scalar_one_or_none()
+
+        if not session:
+            raise NotFoundException(details="Counseling session not found")
+
+        # Check if transcript already exists for this session
+        result = db.execute(
+            select(RawTranscript).where(RawTranscript.session_id == session.id)
+        )
+        existing_transcript = result.scalar_one_or_none()
+
+        if existing_transcript:
+            # Update existing transcript
+            existing_transcript.total_segments = transcript_in.total_segments
+            existing_transcript.raw_transcript = transcript_in.raw_transcript
+            db.commit()
+            db.refresh(existing_transcript)
+            transcript = existing_transcript
+            action = "updated"
+        else:
+            # Create new transcript
+            new_transcript = RawTranscript(
+                session_id=session.id,
+                total_segments=transcript_in.total_segments,
+                raw_transcript=transcript_in.raw_transcript,
+            )
+            db.add(new_transcript)
+            db.commit()
+            db.refresh(new_transcript)
+            transcript = new_transcript
+            action = "created"
+
+        # Reload with relationships
+        stmt = (
+            select(RawTranscript)
+            .options(
+                joinedload(RawTranscript.session).joinedload(
+                    CounselingSession.counselor
+                )
+            )
+            .where(RawTranscript.id == transcript.id)
+        )
+        result = db.execute(stmt)
+        transcript_with_relations = result.scalar_one_or_none()
+
+        print(f"Transcript {action} for session {transcript_in.session_uid}")
+
+        return RawTranscriptResponse(
+            uid=transcript_with_relations.uid,
+            total_segments=transcript_with_relations.total_segments,
+            raw_transcript=transcript_with_relations.raw_transcript,
+            created_at=transcript_with_relations.created_at,
+            updated_at=transcript_with_relations.updated_at,
+            session=transcript_with_relations.session,
+        )
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise BaseAppException(
+            error="Database Error",
+            details=str(e),
+            status_code=500,
+        )
