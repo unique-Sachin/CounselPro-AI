@@ -60,5 +60,5 @@ google-generativeai
 #Email Sending
 aiosmtplib
 
+cloudinary
 ultralytics
-

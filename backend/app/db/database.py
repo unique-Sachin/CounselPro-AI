@@ -46,11 +46,45 @@ async def get_async_db():
 async def create_tables():
     # Import all models to ensure they're registered
     from app.models.counselor import Counselor  # type: ignore
-    from app.models.session import CounselingSession  # type: ignore  
+    from app.models.session import CounselingSession  # type: ignore
     from app.models.catalog_file import CatalogFile  # type: ignore
-    
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+
+# for celery
+# =============================================================================================
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+SYNC_DATABASE_URL = DATABASE_URL.replace("asyncpg", "psycopg2")  # if PostgreSQL
+sync_engine = create_engine(
+    SYNC_DATABASE_URL,
+    echo=True,
+    future=True,
+)
+SyncSessionLocal = sessionmaker(
+    bind=sync_engine,
+    autocommit=False,
+    autoflush=False,
+)
+
+
+# Dependency for sync Celery tasks
+def get_sync_db():
+    db = SyncSessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+# =============================================================================================
 
 
 # Optional test function
