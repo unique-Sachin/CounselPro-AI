@@ -10,6 +10,7 @@ from app.schemas.session_analysis_schema import SessionAnalysisCreate
 
 # from app.service.raw_transcript_service import create_raw_transcript
 from app.service.celery.video_processing_for_celery import (
+    create_or_update_raw_transcript,
     create_or_update_session_analysis,
     create_raw_transcript,
 )
@@ -76,7 +77,7 @@ def process_video(session_uid: str, video_path: str):
                 total_segments=len(results["transcript_data"].get("utterances", [])),
                 raw_transcript=results["transcript_data"],
             )
-            create_raw_transcript(db, transcript_create)
+            create_or_update_raw_transcript(db, transcript_create)
 
         # ---- Save analysis ----
         session_analysis_create = SessionAnalysisCreate(
