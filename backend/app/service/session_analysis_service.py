@@ -234,6 +234,7 @@ def _extract_limited_data(analysis: SessionAnalysis) -> SessionAnalysisBulkItem:
     
     return SessionAnalysisBulkItem(
         session_uid=str(analysis.session.uid),
+        status=analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status),
         created_at=analysis.created_at if isinstance(analysis.created_at, datetime) else datetime.utcnow(),
         updated_at=analysis.updated_at if isinstance(analysis.updated_at, datetime) else datetime.utcnow(),
         video_analysis_summary=video_summary,

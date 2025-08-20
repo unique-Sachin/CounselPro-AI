@@ -57,12 +57,39 @@ const getAnalysisData = (analysis?: BulkAnalysisItem) => {
       qualityScore = Math.max(qualityScore - (redFlagCount * 5), 0);
     }
     
-    // Determine status based on compliance and red flags
-    let status: "Completed" | "Processing" | "Review Required";
-    if (redFlagCount > 3 || compliance < 70) {
-      status = "Review Required";
+    // Determine status based on backend status and analysis results
+    let status: "Completed" | "Processing" | "Review Required" | "Pending";
+    
+    if (analysis.status) {
+      // Use backend status as primary source
+      switch (analysis.status) {
+        case "COMPLETED":
+          // Check if completed analysis needs review based on quality
+          if (redFlagCount > 3 || compliance < 70) {
+            status = "Review Required";
+          } else {
+            status = "Completed";
+          }
+          break;
+        case "STARTED":
+          status = "Processing";
+          break;
+        case "PENDING":
+          status = "Pending";
+          break;
+        case "FAILED":
+          status = "Review Required";
+          break;
+        default:
+          status = "Completed";
+      }
     } else {
-      status = "Completed"; // Default since bulk API doesn't have status yet
+      // Fallback logic when status is not provided
+      if (redFlagCount > 3 || compliance < 70) {
+        status = "Review Required";
+      } else {
+        status = "Completed";
+      }
     }
     
     return {
@@ -72,13 +99,12 @@ const getAnalysisData = (analysis?: BulkAnalysisItem) => {
       redFlagCount
     };
   } else {
-    // Fallback to mock data when no analysis available
-    const statuses = ["Completed", "Processing", "Review Required"] as const;
+    // When no analysis available, show "Pending" to indicate analysis is needed
     return {
-      compliance: Math.floor(Math.random() * 20) + 80, // 80-99%
-      qualityScore: Math.floor(Math.random() * 25) + 75, // 75-99%
-      status: statuses[Math.floor(Math.random() * statuses.length)],
-      redFlagCount: Math.floor(Math.random() * 3) // 0-2 red flags
+      compliance: 0, // No compliance data available
+      qualityScore: 0, // No quality score available
+      status: "Pending" as const, // Indicate analysis is needed
+      redFlagCount: 0 // No red flags data available
     };
   }
 };
@@ -146,8 +172,7 @@ export function RecentAnalyses({
   // Fetch bulk analysis data
   const { 
     data: analysesData, 
-    isLoading: analysesLoading, 
-    error: analysesError 
+    isLoading: analysesLoading
   } = useQuery({
     queryKey: ['bulk-analyses', sessionUids],
     queryFn: () => getBulkSessionAnalyses(sessionUids),
@@ -175,6 +200,8 @@ export function RecentAnalyses({
         return <Badge variant="default">Completed</Badge>;
       case "Processing":
         return <Badge variant="secondary">Processing</Badge>;
+      case "Pending":
+        return <Badge variant="outline">Pending</Badge>;
       case "Review Required":
         return <Badge variant="outline">Review Required</Badge>;
       default:
@@ -183,12 +210,14 @@ export function RecentAnalyses({
   };
 
   const getComplianceBadge = (score: number) => {
+    if (score === 0) return <Badge variant="outline">Pending</Badge>;
     if (score >= 95) return <Badge variant="default">{score}%</Badge>;
     if (score >= 85) return <Badge variant="secondary">{score}%</Badge>;
     return <Badge variant="destructive">{score}%</Badge>;
   };
 
   const getQualityBadge = (score: number) => {
+    if (score === 0) return <Badge variant="outline">Pending</Badge>;
     if (score >= 90) return <Badge variant="default">{score}%</Badge>;
     if (score >= 80) return <Badge variant="secondary">{score}%</Badge>;
     return <Badge variant="outline">{score}%</Badge>;

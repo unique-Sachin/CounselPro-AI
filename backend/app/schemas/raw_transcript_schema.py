@@ -44,3 +44,15 @@ class RawTranscriptResponse(BaseModel):
     session: SessionInfo
 
     model_config = {"from_attributes": True}
+
+
+class RawTranscriptWithStatusResponse(BaseModel):
+    status: str
+    uid: Optional[str] = None
+    total_segments: Optional[int] = None
+    raw_transcript: Optional[Any] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    session: Optional[SessionInfo] = None
+
+    model_config = {"from_attributes": True}

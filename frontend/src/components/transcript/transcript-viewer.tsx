@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getRawTranscript } from "@/lib/services/sessions";
 import { useAnalysis } from "@/contexts/analysis-context";
 import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
+import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
 // Types
 interface TranscriptUtterance {
@@ -253,6 +254,37 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
   // Show error state if fetch failed (optional, can be removed to show placeholder instead)
   if (error) {
     console.warn("Transcript fetch failed:", error);
+  }
+
+  // Check if analysis status is not COMPLETED - show analysis action button
+  if (transcriptResponse?.status && transcriptResponse.status !== "COMPLETED") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="space-y-6"
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Session Transcript
+            </CardTitle>
+            <CardDescription>
+              Transcript will be available after session analysis is completed
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AnalysisActionButton 
+              sessionUid={sessionUid} 
+              status={transcriptResponse.status}
+              className="pt-4 border-t"
+            />
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
   }
 
   // If no data available (either failed to fetch or no transcript exists), show empty state

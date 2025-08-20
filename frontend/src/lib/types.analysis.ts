@@ -85,8 +85,19 @@ export interface VideoAnalysisData {
   };
 }
 
+export interface CourseInfo {
+  name: string;
+  claimed_duration?: string;
+  claimed_fee?: string;
+  catalog_duration?: string;
+  catalog_fee?: string;
+  match_status?: 'MATCH' | 'MISMATCH';
+  confidence_score?: number;
+  notes?: string;
+}
+
 export interface AudioAnalysisData {
-  courses_mentioned?: string[];
+  courses_mentioned?: CourseInfo[];
   overall_summary?: string;
   accuracy_score?: number;
   red_flags?: Array<{
@@ -118,7 +129,7 @@ export interface SessionAnalysisResponse {
       name?: string;
     };
   };
-  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  status?: "PENDING" | "STARTED" | "COMPLETED" | "FAILED";
   progress_percentage?: number;
   
   // Legacy fields for backward compatibility
@@ -256,6 +267,7 @@ export interface BulkAnalysisItem {
   session_uid: string;
   created_at: string;
   updated_at: string;
+  status?: "PENDING" | "STARTED" | "COMPLETED" | "FAILED";
   video_analysis_summary: {
     environment_analysis: {
       attire_assessment: {

@@ -2,11 +2,12 @@
 
 import { useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 import { useSessionAnalysis } from "@/lib/services/analysis";
 import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
 import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
+import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
 export default function AnalysisTab() {
   const params = useParams();
@@ -82,6 +83,30 @@ export default function AnalysisTab() {
   // Error state (404, empty, or other errors)
   if (isError || error || !analysisData) {
     return <AnalysisEmptyState sessionUid={sessionUid} source="session-details" />;
+  }
+
+  // Check if analysis status is not COMPLETED - show analysis action button
+  if (analysisData.status && analysisData.status !== "COMPLETED") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5" />
+            Session Analysis
+          </CardTitle>
+          <CardDescription>
+            Analysis results will be available after processing is completed
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AnalysisActionButton 
+            sessionUid={sessionUid} 
+            status={analysisData.status}
+            className="pt-4 border-t"
+          />
+        </CardContent>
+      </Card>
+    );
   }
 
   // Success state - show the analysis dashboard

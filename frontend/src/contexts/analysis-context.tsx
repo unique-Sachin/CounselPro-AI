@@ -7,8 +7,8 @@ interface AnalysisContextType {
   setIsAnalyzing: (analyzing: boolean) => void;
   sessionUid: string | null;
   setSessionUid: (uid: string | null) => void;
-  analysisSource: 'session-details' | 'transcript-tab' | null;
-  setAnalysisSource: (source: 'session-details' | 'transcript-tab' | null) => void;
+  analysisSource: 'session-details' | 'transcript-tab' | 'analysis-tab' | 'analysis-action-button' | null;
+  setAnalysisSource: (source: 'session-details' | 'transcript-tab' | 'analysis-tab' | 'analysis-action-button' | null) => void;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -28,7 +28,7 @@ interface AnalysisProviderProps {
 export function AnalysisProvider({ children }: AnalysisProviderProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [sessionUid, setSessionUid] = useState<string | null>(null);
-  const [analysisSource, setAnalysisSource] = useState<'session-details' | 'transcript-tab' | null>(null);
+  const [analysisSource, setAnalysisSource] = useState<'session-details' | 'transcript-tab' | 'analysis-tab' | 'analysis-action-button' | null>(null);
 
   return (
     <AnalysisContext.Provider 

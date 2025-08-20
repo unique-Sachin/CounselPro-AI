@@ -80,6 +80,7 @@ class AudioAnalysisSummary(BaseModel):
 
 class SessionAnalysisBulkItem(BaseModel):
     session_uid: str
+    status: str
     created_at: datetime
     updated_at: datetime
     video_analysis_summary: VideoAnalysisSummary

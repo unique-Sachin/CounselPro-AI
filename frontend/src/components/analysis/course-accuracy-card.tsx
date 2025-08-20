@@ -4,10 +4,11 @@ import { BarChart3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { CourseInfo } from "@/lib/types.analysis";
 
 interface AudioAnalysisData {
   accuracy_score?: number;
-  courses_mentioned?: string[];
+  courses_mentioned?: CourseInfo[];
   overall_summary?: string;
 }
 
@@ -83,11 +84,28 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
           <div className="space-y-2">
             <span className="text-sm font-medium">Courses Mentioned</span>
             {coursesMentioned.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {coursesMentioned.map((course: string, index: number) => (
-                  <Badge key={index} variant="secondary" className="text-xs">
-                    {course}
-                  </Badge>
+              <div className="space-y-2">
+                {coursesMentioned.map((course: CourseInfo, index: number) => (
+                  <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {course.name}
+                      </Badge>
+                      {course.match_status && (
+                        <Badge 
+                          variant={course.match_status === "MATCH" ? "default" : "destructive"} 
+                          className="text-xs"
+                        >
+                          {course.match_status}
+                        </Badge>
+                      )}
+                    </div>
+                    {course.confidence_score && (
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(course.confidence_score * 100)}% confidence
+                      </span>
+                    )}
+                  </div>
                 ))}
               </div>
             ) : (
