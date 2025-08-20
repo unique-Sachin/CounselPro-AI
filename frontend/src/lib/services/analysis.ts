@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiHelpers } from "@/lib/api";
 import { 
   SessionAnalysisResponse, 
-  UseSessionAnalysisOptions 
+  UseSessionAnalysisOptions,
+  BulkAnalysisResponse
 } from "@/lib/types.analysis";
 
 /**
@@ -32,6 +33,22 @@ export const triggerSessionAnalysis = async (sessionUid: string): Promise<void> 
   } catch (error) {
     console.error("Failed to trigger session analysis:", error);
     throw error;
+  }
+};
+
+/**
+ * Get bulk session analyses for dashboard
+ * Endpoint: GET /session-analysis/bulk?session_ids=uid1,uid2,uid3
+ */
+export const getBulkSessionAnalyses = async (sessionIds: string[]): Promise<BulkAnalysisResponse> => {
+  try {
+    const sessionIdsParam = sessionIds.join(',');
+    const response = await apiHelpers.get<BulkAnalysisResponse>(`/session-analysis/bulk?session_ids=${sessionIdsParam}`);
+    return response.data;
+  } catch (error) {
+    console.error("Failed to fetch bulk session analyses:", error);
+    // Return empty analyses array on error to handle gracefully
+    return { analyses: [] };
   }
 };
 
@@ -96,6 +113,7 @@ export const useSessionAnalysisWithPolling = (
 export const analysisService = {
   getSessionAnalysisBySession,
   triggerSessionAnalysis,
+  getBulkSessionAnalyses,
   useSessionAnalysis,
   useSessionAnalysisWithPolling,
 };

@@ -5,6 +5,7 @@ from app.db.database import get_async_db
 from app.schemas.session_analysis_schema import (
     SessionAnalysisCreate,
     SessionAnalysisResponse,
+    SessionAnalysisBulkResponse,
 )
 from app.service.session_analysis_service import (
     create_session_analysis as create_analysis,
@@ -12,6 +13,7 @@ from app.service.session_analysis_service import (
     get_analysis_by_session_uid,
     update_session_analysis as update_analysis,
     delete_session_analysis as delete_analysis,
+    get_limited_analyses_by_session_uids,
 )
 from app.exceptions.custom_exception import (
     BaseAppException,
@@ -28,6 +30,24 @@ async def create_session_analysis(
     session_analysis: SessionAnalysisCreate, db: AsyncSession = Depends(get_async_db)
 ):
     return await create_analysis(db, session_analysis)
+
+
+@router.get("/bulk", response_model=SessionAnalysisBulkResponse)
+async def get_bulk_session_analyses(
+    session_ids: str, db: AsyncSession = Depends(get_async_db)
+):
+    """Get session analyses for multiple session UIDs (comma-separated)."""
+    if not session_ids:
+        raise BadRequestException(details="session_ids parameter is required")
+    
+    # Split the comma-separated session IDs
+    session_uid_list = [uid.strip() for uid in session_ids.split(",") if uid.strip()]
+    
+    if not session_uid_list:
+        raise BadRequestException(details="No valid session IDs provided")
+    
+    limited_analyses = await get_limited_analyses_by_session_uids(db, session_uid_list)
+    return SessionAnalysisBulkResponse(analyses=limited_analyses)
 
 
 @router.get("/{uid}", response_model=SessionAnalysisResponse)

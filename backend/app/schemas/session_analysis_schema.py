@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Any
+from typing import Optional, Any, List, Literal
 from datetime import datetime
 from uuid import UUID
 
@@ -39,3 +39,43 @@ class SessionAnalysisResponse(BaseModel):
     session: SessionInfo
 
     model_config = {"from_attributes": True}
+
+
+# Bulk response schemas with limited data
+class AttireAssessment(BaseModel):
+    meets_professional_standards: bool
+
+
+class BackgroundAssessment(BaseModel):
+    meets_professional_standards: bool
+
+
+class EnvironmentAnalysis(BaseModel):
+    attire_assessment: AttireAssessment
+    background_assessment: BackgroundAssessment
+
+
+class VideoAnalysisSummary(BaseModel):
+    environment_analysis: EnvironmentAnalysis
+
+
+class RedFlag(BaseModel):
+    type: str
+    description: str
+    severity: Literal["low", "medium", "high"]
+
+
+class AudioAnalysisSummary(BaseModel):
+    red_flags: List[RedFlag]
+
+
+class SessionAnalysisBulkItem(BaseModel):
+    session_uid: str
+    created_at: datetime
+    updated_at: datetime
+    video_analysis_summary: VideoAnalysisSummary
+    audio_analysis_summary: AudioAnalysisSummary
+
+
+class SessionAnalysisBulkResponse(BaseModel):
+    analyses: List[SessionAnalysisBulkItem]

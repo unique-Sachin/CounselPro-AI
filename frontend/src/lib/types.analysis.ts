@@ -250,3 +250,31 @@ export interface UseSessionAnalysisOptions {
   refetchOnWindowFocus?: boolean;
   refetchInterval?: number;
 }
+
+// Bulk Analysis Types for Dashboard
+export interface BulkAnalysisItem {
+  session_uid: string;
+  created_at: string;
+  updated_at: string;
+  video_analysis_summary: {
+    environment_analysis: {
+      attire_assessment: {
+        meets_professional_standards: boolean;
+      };
+      background_assessment: {
+        meets_professional_standards: boolean;
+      };
+    };
+  };
+  audio_analysis_summary: {
+    red_flags: {
+      type: string;
+      description: string;
+      severity?: string;
+    }[];
+  };
+}
+
+export interface BulkAnalysisResponse {
+  analyses: BulkAnalysisItem[];
+}
