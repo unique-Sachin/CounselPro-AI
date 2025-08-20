@@ -12,6 +12,7 @@ from app.service.raw_transcript_service import create_raw_transcript
 from app.schemas.raw_transcript_schema import RawTranscriptCreate
 from app.service.video_processing.video_extraction import VideoExtractor
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException
@@ -26,8 +27,6 @@ from app.schemas.session_schema import (
     CounselorInfo,
 )
 from app.exceptions.custom_exception import BaseAppException, NotFoundException
-from app.config.log_config import get_logger
-
 from app.config.log_config import get_logger
 
 logger = get_logger("session_service")
@@ -79,6 +78,35 @@ async def create_session(
 async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionResponse:
     try:
         result = await db.execute(
+            select(CounselingSession)
+            .options(joinedload(CounselingSession.counselor))
+            .filter(CounselingSession.uid == session_uid)
+        )
+        session = result.scalars().first()
+        if not session:
+            raise NotFoundException(details=f"Session {session_uid} not found")
+
+        return SessionResponse(
+            uid=session.uid,
+            description=session.description,
+            session_date=session.session_date,
+            recording_link=session.recording_link,
+            counselor=CounselorInfo(
+                uid=str(session.counselor.uid), name=session.counselor.name
+            ),
+        )
+    except SQLAlchemyError as e:
+        raise BaseAppException(
+            error="Database Error",
+            details=str(e),
+            status_code=500,
+        )
+
+
+# for the use of celery (sync version)
+def get_session_by_id_sync(db: Session, session_uid: UUID) -> SessionResponse:
+    try:
+        result = db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
             .filter(CounselingSession.uid == session_uid)
@@ -268,7 +296,9 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
         sessionResponse = await get_session_by_id(db, session_uid)
 
         extraction = VideoExtractor()
-        extraction_data = extraction.get_video_frames_and_audio_paths(str(sessionResponse.recording_link))
+        extraction_data = extraction.get_video_frames_and_audio_paths(
+            str(sessionResponse.recording_link)
+        )
 
         # Initialize video processor
         video_processor = VideoProcessor()
@@ -276,30 +306,36 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
 
         audio_path = extraction_data.get("audio_path")
         transcript_data = None
-      
+
         # If transcription wasn't already done in video processing, do it here
         if audio_path:
             try:
                 print(f"Starting Deepgram transcription for audio: {audio_path}")
                 transcriber = DeepgramTranscriber()
-                transcript_data = transcriber.transcribe_chunk(audio_path, str(session_uid))
+                transcript_data = transcriber.transcribe_chunk(
+                    audio_path, str(session_uid)
+                )
                 print(f"Transcription completed successfully")
-                
+
                 # Save transcript to database
                 try:
                     total_segments = len(transcript_data.get("utterances", []))
                     transcript_create = RawTranscriptCreate(
                         session_uid=str(session_uid),
                         total_segments=total_segments,
-                        raw_transcript=transcript_data
+                        raw_transcript=transcript_data,
                     )
-                    
-                    saved_transcript = await create_raw_transcript(db, transcript_create)
-                    print(f"Transcript saved to database with UID: {saved_transcript.uid}")
-                    
+
+                    saved_transcript = await create_raw_transcript(
+                        db, transcript_create
+                    )
+                    print(
+                        f"Transcript saved to database with UID: {saved_transcript.uid}"
+                    )
+
                 except Exception as db_error:
                     print(f"Warning: Failed to save transcript to database: {db_error}")
-                    
+
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
 
@@ -321,16 +357,18 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
                 session_analysis_create = SessionAnalysisCreate(
                     session_uid=str(session_uid),
                     video_analysis_data=video_analysis_data,
-                    audio_analysis_data=audio_analysis_data
+                    audio_analysis_data=audio_analysis_data,
                 )
-                
-                saved_analysis = await create_or_update_session_analysis(db, session_analysis_create)
+
+                saved_analysis = await create_or_update_session_analysis(
+                    db, session_analysis_create
+                )
                 print(f"Session analysis saved/updated with UID: {saved_analysis.uid}")
 
             except Exception as verification_error:
                 print(f"Warning: Course verification failed: {verification_error}")
 
-        return {"msg":"Audio/Video data analyzed successfully"}
+        return {"msg": "Audio/Video data analyzed successfully"}
 
         # Here you can add logic to store the results in the database
         # or send them to another service for further processing
@@ -345,8 +383,8 @@ async def process_video_background(db: AsyncSession, session_uid: UUID):
             status_code=500,
         )
     finally:
-            try:
-                if extraction:
-                    extraction.cleanup()
-            except Exception as cleanup_error:
-                logger.warning(f"Error during cleanup: {cleanup_error}")
+        try:
+            if extraction:
+                extraction.cleanup()
+        except Exception as cleanup_error:
+            logger.warning(f"Error during cleanup: {cleanup_error}")

@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, DateTime, JSON, ForeignKey, Enum
+from sqlalchemy import Column, Integer, DateTime, JSON, ForeignKey
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -7,11 +8,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from app.db.database import Base
 
 
-class AnalysisStatus(enum.Enum):
-    PENDING = "pending"
-    STARTED = "started"
-    FAILED = "failed"
-    COMPLETED = "completed"
+class AnalysisStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    STARTED = "STARTED"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class SessionAnalysis(Base):
@@ -28,7 +29,9 @@ class SessionAnalysis(Base):
     video_analysis_data = Column(JSON)  # Using JSON type for structured data
     audio_analysis_data = Column(JSON)  # Using JSON type for structured data
     status = Column(
-        Enum(AnalysisStatus), default=AnalysisStatus.PENDING, nullable=False
+        SQLEnum(AnalysisStatus),
+        default=AnalysisStatus.PENDING,
+        nullable=False,
     )
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
