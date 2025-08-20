@@ -2,7 +2,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from app.models.video_analysis import VideoAnalysisResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from typing import List
+from app.service.celery.celery_worker import process_video
+from app.db.database import SyncSessionLocal
+from app.db.database import get_sync_db
 
 from app.db.database import get_async_db
 from app.schemas.session_schema import (
@@ -19,6 +23,7 @@ from app.service.session_service import (
     update_session,
     delete_session,
     process_video_background,
+    get_session_by_id_sync,
 )
 
 router = APIRouter(prefix="/sessions", tags=["Counseling Sessions"])
@@ -100,3 +105,20 @@ async def get_session_analysis(
 ):
     results = await process_video_background(db, session_id)
     return results
+
+
+@router.get("/{session_uid}/analysis_by_celery")
+async def get_session_analysis_using_celery_background_task(
+    session_uid: str, db: Session = Depends(get_sync_db)
+):
+    print(f"Starting video processing for session {session_uid}")
+    sessionResponse = get_session_by_id_sync(db, session_uid)
+
+    video_path = sessionResponse.recording_link
+
+    if not video_path:
+        return {"error": "Video path not found"}
+
+    # Send task to Celery worker
+    task = process_video.delay(session_uid, str(video_path))
+    return {"task_id": task.id, "status": "Processing started"}
