@@ -89,3 +89,15 @@ class SessionAnalysisBulkItem(BaseModel):
 
 class SessionAnalysisBulkResponse(BaseModel):
     analyses: List[SessionAnalysisBulkItem]
+
+
+class SessionAnalysisWithStatusResponse(BaseModel):
+    status: str
+    uid: Optional[str] = None
+    video_analysis_data: Optional[Any] = None
+    audio_analysis_data: Optional[Any] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    session: Optional[SessionInfo] = None
+
+    model_config = {"from_attributes": True}

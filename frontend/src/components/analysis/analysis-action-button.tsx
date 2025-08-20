@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { BarChart3, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { analyzeSession, AnalysisTaskResponse } from "@/lib/services/sessions";
-import { useAnalysis } from "@/contexts/analysis-context";
 
 interface AnalysisActionButtonProps {
   sessionUid: string;
@@ -22,16 +21,9 @@ export function AnalysisActionButton({
   className = "" 
 }: AnalysisActionButtonProps) {
   const queryClient = useQueryClient();
-  const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
 
   const analysisMutation = useMutation<AnalysisTaskResponse, Error, void>({
     mutationFn: () => analyzeSession(sessionUid),
-    onMutate: () => {
-      // Set global analysis state when starting
-      setSessionUid(sessionUid);
-      setAnalysisSource('analysis-action-button');
-      setIsAnalyzing(true);
-    },
     onSuccess: (data) => {
       toast.success("Analysis Started", {
         description: `Session analysis has been queued successfully. Task ID: ${data.task_id}`,
@@ -55,24 +47,22 @@ export function AnalysisActionButton({
         refetchType: 'all'
       });
       
-      // Release global lock since the request completed (analysis continues in background)
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
+      // Keep global analyzing state active if response status is STARTED
+      // Only release the lock if the task failed to start
+      if (data.status !== "STARTED") {
+        // Analysis completed or failed to start
+      }
+      // If status is STARTED, the analysis continues in background via Celery
     },
     onError: (error) => {
       console.error("Analysis failed to start:", error);
       toast.error("Analysis Failed to Start", {
         description: "Failed to queue the session analysis. Please try again.",
       });
-      // Release global lock on error
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
     },
   });
 
-  const isAnalyzing = analysisMutation.isPending || globalIsAnalyzing || isLoading;
+  const isAnalyzing = analysisMutation.isPending || isLoading;
 
   // Get button text based on status
   const getButtonText = () => {

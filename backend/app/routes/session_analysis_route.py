@@ -6,11 +6,13 @@ from app.schemas.session_analysis_schema import (
     SessionAnalysisCreate,
     SessionAnalysisResponse,
     SessionAnalysisBulkResponse,
+    SessionAnalysisWithStatusResponse,
 )
 from app.service.session_analysis_service import (
     create_session_analysis as create_analysis,
     get_analysis_by_uid,
     get_analysis_by_session_uid,
+    get_analysis_by_session_uid_with_status,
     update_session_analysis as update_analysis,
     delete_session_analysis as delete_analysis,
     get_limited_analyses_by_session_uids,
@@ -58,14 +60,16 @@ async def get_session_analysis(uid: str, db: AsyncSession = Depends(get_async_db
     return analysis
 
 
-@router.get("/by-session/{session_uid}", response_model=SessionAnalysisResponse)
+@router.get("/by-session/{session_uid}", response_model=SessionAnalysisWithStatusResponse)
 async def get_analysis_by_session(
     session_uid: str, db: AsyncSession = Depends(get_async_db)
 ):
-    analysis = await get_analysis_by_session_uid(db, session_uid)
-    if not analysis:
-        raise NotFoundException(details="Session analysis not found")
-    return analysis
+    """
+    Get session analysis by session UID.
+    Returns full analysis data only if status is 'COMPLETED',
+    otherwise returns status with empty data.
+    """
+    return await get_analysis_by_session_uid_with_status(db, session_uid)
 
 
 @router.put("/{uid}", response_model=SessionAnalysisResponse)

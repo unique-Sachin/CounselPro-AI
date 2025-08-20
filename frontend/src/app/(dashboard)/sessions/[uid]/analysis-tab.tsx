@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useSessionAnalysis } from "@/lib/services/analysis";
+import { useSessionAnalysisWithPolling } from "@/lib/services/analysis";
 import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
 import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
 import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
@@ -18,9 +18,8 @@ export default function AnalysisTab() {
     isLoading,
     error,
     isError,
-  } = useSessionAnalysis(sessionUid, {
-    staleTime: 30_000,
-    retry: 1,
+  } = useSessionAnalysisWithPolling(sessionUid, {
+    pollingInterval: 5000, // Poll every 5 seconds when status is PENDING/STARTED
   });
 
   // Loading state

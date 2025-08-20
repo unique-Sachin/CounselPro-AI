@@ -63,8 +63,6 @@ export const useSessionAnalysis = (
 ) => {
   const {
     enabled = true,
-    staleTime = 30_000, // 30 seconds
-    retry = 1,
     refetchOnWindowFocus = false,
     refetchInterval,
   } = options;
@@ -73,8 +71,6 @@ export const useSessionAnalysis = (
     queryKey: ["session-analysis", sessionUid],
     queryFn: () => getSessionAnalysisBySession(sessionUid),
     enabled: !!sessionUid && enabled,
-    staleTime,
-    retry,
     refetchOnWindowFocus,
     refetchInterval,
     // Add meta information for debugging
@@ -98,7 +94,7 @@ export const useSessionAnalysisWithPolling = (
   const baseQuery = useSessionAnalysis(sessionUid, queryOptions);
   
   // Determine if we should continue polling based on status
-  const shouldPoll = baseQuery.data?.status === 'pending' || baseQuery.data?.status === 'processing';
+  const shouldPoll = baseQuery.data?.status === 'STARTED';
   
   // Create a polling query that inherits from the base query
   const pollingQuery = useSessionAnalysis(sessionUid, {

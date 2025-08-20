@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Clock, FileText, Loader2, BarChart3 } from "lucide-react";
+import { Search, Clock, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRawTranscript } from "@/lib/services/sessions";
-import { useAnalysis } from "@/contexts/analysis-context";
 import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
 import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
@@ -79,7 +78,6 @@ const getBadgeVariant = (role: string) => {
 export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnlyCounselor, setShowOnlyCounselor] = useState(false);
-  const { isAnalyzing } = useAnalysis();
 
   // Fetch transcript data from API
   const {
@@ -91,8 +89,7 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
     queryKey: ["raw-transcript", sessionUid],
     queryFn: () => getRawTranscript(sessionUid),
     enabled: !!sessionUid,
-    retry: 1, // Only retry once for transcript fetching
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,    
   });
 
   // Extract transcript data from API response or use passed data (for backward compatibility)  
@@ -190,67 +187,6 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
     );
   }
 
-  // Show analyzing overlay when analysis is running
-  if (isAnalyzing) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Analyzing Session
-            </CardTitle>
-            <CardDescription>
-              Please wait while we analyze the session and generate transcript...
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <motion.div 
-              className="text-center py-16"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <motion.div 
-                className="mx-auto w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              >
-                <BarChart3 className="w-12 h-12 text-primary" />
-              </motion.div>
-              <motion.div 
-                className="space-y-3"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-              >
-                <h3 className="text-xl font-semibold">Analysis in Progress</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  We&apos;re analyzing the session content to generate insights and transcript. 
-                  This may take a few minutes.
-                </p>
-                <motion.div 
-                  className="flex items-center justify-center gap-2 mt-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.5 }}
-                >
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Processing...</span>
-                </motion.div>
-              </motion.div>
-            </motion.div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
-  }
-
   // Show error state if fetch failed (optional, can be removed to show placeholder instead)
   if (error) {
     console.warn("Transcript fetch failed:", error);
@@ -294,7 +230,7 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
 
   return (
     <motion.div 
-      className={`space-y-6 ${isLoading || isAnalyzing ? 'pointer-events-none' : ''}`}
+      className="space-y-6"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -305,12 +241,12 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
       >
-        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Transcript Controls
-            {(isFetching && !isLoading) || isAnalyzing ? (
+            {(isFetching && !isLoading) ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : null}
           </CardTitle>
@@ -352,11 +288,11 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Conversation
-            {(isFetching && !isLoading) || isAnalyzing ? (
+            {(isFetching && !isLoading) ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : null}
           </CardTitle>

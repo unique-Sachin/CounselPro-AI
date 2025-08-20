@@ -167,7 +167,9 @@ export function KpiRow() {
   } = useQuery({
     queryKey: ['counselors-count'],
     queryFn: () => listCounselors(0, 1), // Just get total count, limit to 1 for efficiency
-    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 2 * 60 * 1000,  // Cache for 2 minutes
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
+
   });
 
   // Fetch sessions data
@@ -178,7 +180,8 @@ export function KpiRow() {
   } = useQuery({
     queryKey: ['sessions-count'],
     queryFn: () => listSessions({ skip: 0, limit: 1 }), // Just get total count, limit to 1 for efficiency
-    refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 2 * 60 * 1000,  // Cache for 2 minutes
+    refetchOnWindowFocus: true, // Refresh when user returns to tab
   });
 
   // Prepare KPI data

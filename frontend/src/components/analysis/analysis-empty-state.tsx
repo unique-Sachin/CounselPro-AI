@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { BarChart3, Loader2, Play } from "lucide-react";
 import { analyzeSession } from "@/lib/services/sessions";
 import { useAnalysis } from "@/contexts/analysis-context";
-import { useNavigationLock } from "@/hooks/use-navigation-lock";
 import { toast } from "sonner";
 
 interface AnalysisEmptyStateProps {
@@ -21,8 +20,6 @@ export default function AnalysisEmptyState({
   const queryClient = useQueryClient();
   const { setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
   
-  // Enable navigation lock when analyzing
-  useNavigationLock();
 
   // Mutation for triggering analysis
   const analysisMutation = useMutation({

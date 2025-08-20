@@ -6,6 +6,7 @@ from app.models.session import CounselingSession
 from app.schemas.session_analysis_schema import (
     SessionAnalysisCreate, 
     SessionAnalysisBulkItem,
+    SessionAnalysisWithStatusResponse,
     VideoAnalysisSummary,
     AudioAnalysisSummary,
     EnvironmentAnalysis,
@@ -259,3 +260,77 @@ async def get_limited_analyses_by_session_uids(db: AsyncSession, session_uids: l
             continue
     
     return limited_analyses
+
+
+async def get_analysis_by_session_uid_with_status(
+    db: AsyncSession, session_uid: str
+) -> SessionAnalysisWithStatusResponse:
+    """
+    Get session analysis by session UID, but only return full data if analysis is completed.
+    Returns status and empty data if analysis is not completed.
+    """
+    try:
+        # First, check if session analysis exists and get its status
+        stmt = (
+            select(SessionAnalysis)
+            .join(SessionAnalysis.session)
+            .options(
+                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+            )
+            .where(CounselingSession.uid == session_uid)
+        )
+        result = await db.execute(stmt)
+        analysis = result.scalar_one_or_none()
+        
+        # If no analysis exists, return PENDING status with empty data
+        if not analysis:
+            return SessionAnalysisWithStatusResponse(
+                status="PENDING",
+                uid=None,
+                video_analysis_data=None,
+                audio_analysis_data=None,
+                created_at=None,
+                updated_at=None,
+                session=None
+            )
+        
+        # Get status
+        status = "PENDING"  # Default status
+        if hasattr(analysis, 'status'):
+            status = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
+        
+        # If analysis is not completed, return only status with empty data
+        if status != "COMPLETED":
+            return SessionAnalysisWithStatusResponse(
+                status=status,
+                uid=None,
+                video_analysis_data=None,
+                audio_analysis_data=None,
+                created_at=None,
+                updated_at=None,
+                session=None
+            )
+        
+        # If completed, return full analysis data
+        return SessionAnalysisWithStatusResponse(
+            status=status,
+            uid=str(analysis.uid),
+            video_analysis_data=analysis.video_analysis_data,
+            audio_analysis_data=analysis.audio_analysis_data,
+            created_at=analysis.created_at,
+            updated_at=analysis.updated_at,
+            session=analysis.session,
+        )
+
+    except Exception as e:
+        # Log error and return default response
+        print(f"Error getting analysis for session {session_uid}: {e}")
+        return SessionAnalysisWithStatusResponse(
+            status="PENDING",
+            uid=None,
+            video_analysis_data=None,
+            audio_analysis_data=None,
+            created_at=None,
+            updated_at=None,
+            session=None
+        )

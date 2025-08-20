@@ -21,8 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TranscriptViewer from "@/components/transcript/transcript-viewer";
-import { useAnalysis } from "@/contexts/analysis-context";
-import { useNavigationLock } from "@/hooks/use-navigation-lock";
 
 import { getSession } from "@/lib/services/sessions";
 import AnalysisTab from "./analysis-tab";
@@ -32,10 +30,6 @@ export default function SessionDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const sessionUid = params.uid as string;
-  const { isAnalyzing: globalIsAnalyzing } = useAnalysis();
-
-  // Enable navigation lock when analysis is running
-  useNavigationLock();
 
   // Fetch session details
   const {
@@ -46,8 +40,7 @@ export default function SessionDetailsPage() {
     queryKey: ["session", sessionUid],
     queryFn: () => getSession(sessionUid),
     enabled: !!sessionUid,
-    staleTime: 10_000, // 10 seconds - refresh more frequently during analysis
-    refetchInterval: globalIsAnalyzing ? 5000 : false, // Refetch every 5 seconds while analysis is running
+    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,
   });
 
   const isAudioUrl = (url: string) => {
@@ -115,7 +108,7 @@ export default function SessionDetailsPage() {
 
   return (
     <PageTransition>
-      <div className={`container max-w-6xl mx-auto py-6 relative ${globalIsAnalyzing ? 'pointer-events-none' : ''}`}>
+      <div className="container max-w-6xl mx-auto py-6 relative">
         {/* Header */}
         <div className="mb-6">
           <Button 
@@ -123,7 +116,6 @@ export default function SessionDetailsPage() {
             size="sm" 
             onClick={() => router.back()} 
             className="mb-4"
-            disabled={globalIsAnalyzing}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
@@ -145,13 +137,13 @@ export default function SessionDetailsPage() {
         >
           <Tabs defaultValue="details">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="details" disabled={globalIsAnalyzing}>
+              <TabsTrigger value="details">
                 Session Details
               </TabsTrigger>
-              <TabsTrigger value="transcript" disabled={globalIsAnalyzing}>
+              <TabsTrigger value="transcript">
                 Transcript
               </TabsTrigger>
-              <TabsTrigger value="analysis" disabled={globalIsAnalyzing}>
+              <TabsTrigger value="analysis">
                 Analysis
               </TabsTrigger>
             </TabsList>
