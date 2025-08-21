@@ -1,10 +1,10 @@
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import desc, select, and_
 from app.models.session_analysis import SessionAnalysis
 from app.models.session import CounselingSession
 from app.schemas.session_analysis_schema import (
-    SessionAnalysisCreate, 
+    SessionAnalysisCreate,
     SessionAnalysisBulkItem,
     SessionAnalysisWithStatusResponse,
     VideoAnalysisSummary,
@@ -12,7 +12,7 @@ from app.schemas.session_analysis_schema import (
     EnvironmentAnalysis,
     AttireAssessment,
     BackgroundAssessment,
-    RedFlag
+    RedFlag,
 )
 from typing import List, Optional
 from datetime import datetime
@@ -118,12 +118,14 @@ async def create_or_update_session_analysis(
         # updated_at will be automatically set by SQLAlchemy onupdate
         await db.commit()
         await db.refresh(existing_analysis)
-        
+
         # Reload with relationships
         stmt = (
             select(SessionAnalysis)
             .options(
-                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+                joinedload(SessionAnalysis.session).joinedload(
+                    CounselingSession.counselor
+                )
             )
             .where(SessionAnalysis.id == existing_analysis.id)
         )
@@ -144,7 +146,9 @@ async def create_or_update_session_analysis(
         stmt = (
             select(SessionAnalysis)
             .options(
-                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+                joinedload(SessionAnalysis.session).joinedload(
+                    CounselingSession.counselor
+                )
             )
             .where(SessionAnalysis.id == db_session_analysis.id)
         )
@@ -186,7 +190,9 @@ async def delete_session_analysis(db: AsyncSession, uid: str) -> bool:
     return False
 
 
-async def get_analyses_by_session_uids(db: AsyncSession, session_uids: list[str]) -> list[SessionAnalysis]:
+async def get_analyses_by_session_uids(
+    db: AsyncSession, session_uids: list[str]
+) -> list[SessionAnalysis]:
     """Get session analyses for multiple session UIDs."""
     stmt = (
         select(SessionAnalysis)
@@ -195,6 +201,7 @@ async def get_analyses_by_session_uids(db: AsyncSession, session_uids: list[str]
             joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
         )
         .where(CounselingSession.uid.in_(session_uids))
+        .order_by(desc(CounselingSession.id))
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
@@ -202,52 +209,72 @@ async def get_analyses_by_session_uids(db: AsyncSession, session_uids: list[str]
 
 def _extract_limited_data(analysis: SessionAnalysis) -> SessionAnalysisBulkItem:
     """Transform full SessionAnalysis data into limited format for bulk response."""
-    
+
     # Extract video analysis summary
     video_data = analysis.video_analysis_data or {}
     environment_data = video_data.get("environment_analysis", {})
-    
+
     video_summary = VideoAnalysisSummary(
         environment_analysis=EnvironmentAnalysis(
             attire_assessment=AttireAssessment(
-                meets_professional_standards=environment_data.get("attire_assessment", {}).get("meets_professional_standards", False)
+                meets_professional_standards=environment_data.get(
+                    "attire_assessment", {}
+                ).get("meets_professional_standards", False)
             ),
             background_assessment=BackgroundAssessment(
-                meets_professional_standards=environment_data.get("background_assessment", {}).get("meets_professional_standards", False)
-            )
+                meets_professional_standards=environment_data.get(
+                    "background_assessment", {}
+                ).get("meets_professional_standards", False)
+            ),
         )
     )
-    
+
     # Extract audio analysis summary
     audio_data = analysis.audio_analysis_data or {}
     red_flags_data = audio_data.get("red_flags", [])
-    
+
     red_flags = []
     for flag in red_flags_data:
         if isinstance(flag, dict):
-            red_flags.append(RedFlag(
-                type=flag.get("type", ""),
-                description=flag.get("description", ""),
-                severity=flag.get("severity", "low")
-            ))
-    
+            red_flags.append(
+                RedFlag(
+                    type=flag.get("type", ""),
+                    description=flag.get("description", ""),
+                    severity=flag.get("severity", "low"),
+                )
+            )
+
     audio_summary = AudioAnalysisSummary(red_flags=red_flags)
-    
+
     return SessionAnalysisBulkItem(
         session_uid=str(analysis.session.uid),
-        status=analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status),
-        created_at=analysis.created_at if isinstance(analysis.created_at, datetime) else datetime.utcnow(),
-        updated_at=analysis.updated_at if isinstance(analysis.updated_at, datetime) else datetime.utcnow(),
+        status=(
+            analysis.status.value
+            if hasattr(analysis.status, "value")
+            else str(analysis.status)
+        ),
+        created_at=(
+            analysis.created_at
+            if isinstance(analysis.created_at, datetime)
+            else datetime.utcnow()
+        ),
+        updated_at=(
+            analysis.updated_at
+            if isinstance(analysis.updated_at, datetime)
+            else datetime.utcnow()
+        ),
         video_analysis_summary=video_summary,
-        audio_analysis_summary=audio_summary
+        audio_analysis_summary=audio_summary,
     )
 
 
-async def get_limited_analyses_by_session_uids(db: AsyncSession, session_uids: list[str]) -> list[SessionAnalysisBulkItem]:
+async def get_limited_analyses_by_session_uids(
+    db: AsyncSession, session_uids: list[str]
+) -> list[SessionAnalysisBulkItem]:
     """Get limited session analyses data for multiple session UIDs."""
     # Get full data first
     full_analyses = await get_analyses_by_session_uids(db, session_uids)
-    
+
     # Transform to limited format
     limited_analyses = []
     for analysis in full_analyses:
@@ -258,7 +285,7 @@ async def get_limited_analyses_by_session_uids(db: AsyncSession, session_uids: l
             # Log error but continue with other analyses
             print(f"Error processing analysis for session {analysis.session.uid}: {e}")
             continue
-    
+
     return limited_analyses
 
 
@@ -275,13 +302,15 @@ async def get_analysis_by_session_uid_with_status(
             select(SessionAnalysis)
             .join(SessionAnalysis.session)
             .options(
-                joinedload(SessionAnalysis.session).joinedload(CounselingSession.counselor)
+                joinedload(SessionAnalysis.session).joinedload(
+                    CounselingSession.counselor
+                )
             )
             .where(CounselingSession.uid == session_uid)
         )
         result = await db.execute(stmt)
         analysis = result.scalar_one_or_none()
-        
+
         # If no analysis exists, return PENDING status with empty data
         if not analysis:
             return SessionAnalysisWithStatusResponse(
@@ -291,14 +320,18 @@ async def get_analysis_by_session_uid_with_status(
                 audio_analysis_data=None,
                 created_at=None,
                 updated_at=None,
-                session=None
+                session=None,
             )
-        
+
         # Get status
         status = "PENDING"  # Default status
-        if hasattr(analysis, 'status'):
-            status = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
-        
+        if hasattr(analysis, "status"):
+            status = (
+                analysis.status.value
+                if hasattr(analysis.status, "value")
+                else str(analysis.status)
+            )
+
         # If analysis is not completed, return only status with empty data
         if status != "COMPLETED":
             return SessionAnalysisWithStatusResponse(
@@ -308,9 +341,9 @@ async def get_analysis_by_session_uid_with_status(
                 audio_analysis_data=None,
                 created_at=None,
                 updated_at=None,
-                session=None
+                session=None,
             )
-        
+
         # If completed, return full analysis data
         return SessionAnalysisWithStatusResponse(
             status=status,
@@ -332,5 +365,5 @@ async def get_analysis_by_session_uid_with_status(
             audio_analysis_data=None,
             created_at=None,
             updated_at=None,
-            session=None
+            session=None,
         )
