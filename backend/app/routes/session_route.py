@@ -121,4 +121,6 @@ async def get_session_analysis_using_celery_background_task(
 
     # Send task to Celery worker
     task = process_video.delay(session_uid, str(video_path))
-    return {"task_id": task.id, "status": "Processing started"}
+    
+    # Return with proper status format
+    return {"task_id": task.id, "status": "STARTED"}

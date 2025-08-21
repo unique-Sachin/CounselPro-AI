@@ -1,28 +1,64 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   BarChart3,
-  Camera
+  RefreshCw
 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { SessionAnalysisResponse } from "@/lib/types.analysis";
 import CourseAccuracyCard from "./course-accuracy-card";
 import PaymentVerificationCard from "./PaymentVerificationCard";
 import PressureAnalysisCard from "./PressureAnalysisCard";
 import OneOnOneCard from "./OneOnOneCard";
 import ParticipantsGrid from "./participants-grid";
+import EnvironmentCard from "./environment-card";
+import SessionTimeline from "./session-timeline";
+import TechnicalInfo from "./technical-info";
 
 interface AnalysisDashboardProps {
   analysisData: SessionAnalysisResponse;
+  uid: string;
 }
 
-export default function AnalysisDashboard({ analysisData }: AnalysisDashboardProps) {
+export default function AnalysisDashboard({ analysisData, uid }: AnalysisDashboardProps) {
   // Extract the specific data structure from the response
   const videoAnalysis = analysisData.video_analysis_data;
   const audioAnalysis = analysisData.audio_analysis_data;
+  
+  // Query client for invalidating queries
+  const queryClient = useQueryClient();
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Handle refresh functionality
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: ['session-analysis', uid]
+      });
+      // Wait a bit for the query to complete
+      setTimeout(() => setIsRefreshing(false), 1000);
+    } catch (error) {
+      console.error('Error refreshing analysis:', error);
+      setIsRefreshing(false);
+    }
+  };
+
+  // Format the updated_at timestamp
+  const formatLastUpdated = (timestamp?: string) => {
+    if (!timestamp) return 'Unknown';
+    try {
+      return format(new Date(timestamp), 'MMM dd, yyyy \'at\' h:mm a');
+    } catch {
+      return 'Invalid date';
+    }
+  };
   
   // Animation variants for cards
   const cardVariants = {
@@ -60,10 +96,27 @@ export default function AnalysisDashboard({ analysisData }: AnalysisDashboardPro
                 <CardDescription>
                   Comprehensive analysis of video engagement and course accuracy
                 </CardDescription>
+                {analysisData.updated_at && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Last updated: {formatLastUpdated(analysisData.updated_at)}
+                  </p>
+                )}
               </div>
-              <Badge variant="default">
-                COMPLETED
-              </Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </Button>
+                <Badge variant="default">
+                  COMPLETED
+                </Badge>
+              </div>
             </div>
           </CardHeader>
         </Card>
@@ -105,80 +158,35 @@ export default function AnalysisDashboard({ analysisData }: AnalysisDashboardPro
         <ParticipantsGrid videoAnalysisData={videoAnalysis} />
       </motion.div>
 
-      {/* Additional Analysis Details */}
-      {(videoAnalysis?.environment_analysis || videoAnalysis?.technical_info) && (
-        <motion.div variants={cardVariants}>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Environment & Technical Analysis
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2">
-                {/* Environment Analysis */}
-                {videoAnalysis.environment_analysis && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Environment Assessment</h4>
-                    
-                    {videoAnalysis.environment_analysis.attire_assessment && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium">Attire Rating</span>
-                          <span className="text-xs">{videoAnalysis.environment_analysis.attire_assessment.overall_rating}%</span>
-                        </div>
-                        <Progress value={videoAnalysis.environment_analysis.attire_assessment.overall_rating} className="h-1.5" />
-                        <p className="text-xs text-muted-foreground">
-                          {videoAnalysis.environment_analysis.attire_assessment.description}
-                        </p>
-                      </div>
-                    )}
+      {/* Environment Card */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        className="mt-6"
+      >
+        <EnvironmentCard videoAnalysisData={videoAnalysis} />
+      </motion.div>
 
-                    {videoAnalysis.environment_analysis.background_assessment && (
-                      <div className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-medium">Background Rating</span>
-                          <span className="text-xs">{videoAnalysis.environment_analysis.background_assessment.overall_rating}%</span>
-                        </div>
-                        <Progress value={videoAnalysis.environment_analysis.background_assessment.overall_rating} className="h-1.5" />
-                        <p className="text-xs text-muted-foreground">
-                          {videoAnalysis.environment_analysis.background_assessment.description}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
+      {/* Session Timeline */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        className="mt-6"
+      >
+        <SessionTimeline videoAnalysisData={videoAnalysis} />
+      </motion.div>
 
-                {/* Technical Info */}
-                {videoAnalysis.technical_info && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Technical Details</h4>
-                    <div className="space-y-2 text-xs">
-                      <div className="flex justify-between">
-                        <span>Analysis Method:</span>
-                        <span className="font-mono">{videoAnalysis.technical_info.analysis_method}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Frames Analyzed:</span>
-                        <span className="font-mono">{videoAnalysis.technical_info.total_frames_analyzed}</span>
-                      </div>
-                      {videoAnalysis.technical_info.analysis_timestamp && (
-                        <div className="flex justify-between">
-                          <span>Processed:</span>
-                          <span className="font-mono">
-                            {new Date(videoAnalysis.technical_info.analysis_timestamp).toLocaleString()}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
+      {/* Technical Information */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        className="mt-6"
+      >
+        <TechnicalInfo videoAnalysisData={videoAnalysis} />
+      </motion.div>
     </motion.div>
   );
 }

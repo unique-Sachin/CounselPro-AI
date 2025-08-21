@@ -1,10 +1,9 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
-import { toast } from "sonner";
 import { 
   ArrowLeft, 
   Calendar, 
@@ -12,9 +11,7 @@ import {
   Users, 
   ExternalLink,
   Play,
-  Volume2,
-  BarChart3,
-  Loader2
+  Volume2
 } from "lucide-react";
 
 import { PageTransition } from "@/components/page-transition";
@@ -24,20 +21,15 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TranscriptViewer from "@/components/transcript/transcript-viewer";
-import { useAnalysis } from "@/contexts/analysis-context";
-import { useNavigationLock } from "@/hooks/use-navigation-lock";
 
-import { getSession, analyzeSession } from "@/lib/services/sessions";
+import { getSession } from "@/lib/services/sessions";
 import AnalysisTab from "./analysis-tab";
+import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
 export default function SessionDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const sessionUid = params.uid as string;
-  const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
-
-  // Enable navigation lock when analysis is running
-  useNavigationLock();
 
   // Fetch session details
   const {
@@ -48,39 +40,8 @@ export default function SessionDetailsPage() {
     queryKey: ["session", sessionUid],
     queryFn: () => getSession(sessionUid),
     enabled: !!sessionUid,
+    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,
   });
-
-  // Analysis mutation
-  const analysisMutation = useMutation({
-    mutationFn: () => analyzeSession(sessionUid),
-    onMutate: () => {
-      // Set global analysis state when starting
-      setSessionUid(sessionUid);
-      setAnalysisSource('session-details');
-      setIsAnalyzing(true);
-    },
-    onSuccess: () => {
-      toast.success("Analysis Completed", {
-        description: "Session analysis has been completed successfully.",
-      });
-      // Release global lock
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
-    },
-    onError: (error) => {
-      console.error("Analysis failed:", error);
-      toast.error("Analysis Failed", {
-        description: "Failed to analyze the session. Please try again.",
-      });
-      // Release global lock on error
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
-    },
-  });
-
-  const isAnalyzing = analysisMutation.isPending || globalIsAnalyzing;
 
   const isAudioUrl = (url: string) => {
     return /\.(mp3|wav|ogg|m4a|aac|flac)(\?.*)?$/i.test(url) || url.includes("audio");
@@ -147,7 +108,7 @@ export default function SessionDetailsPage() {
 
   return (
     <PageTransition>
-      <div className={`container max-w-6xl mx-auto py-6 relative ${isAnalyzing ? 'pointer-events-none' : ''}`}>
+      <div className="container max-w-6xl mx-auto py-6 relative">
         {/* Header */}
         <div className="mb-6">
           <Button 
@@ -155,7 +116,6 @@ export default function SessionDetailsPage() {
             size="sm" 
             onClick={() => router.back()} 
             className="mb-4"
-            disabled={isAnalyzing}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
@@ -175,21 +135,21 @@ export default function SessionDetailsPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Tabs defaultValue="details" className="space-y-6">
+          <Tabs defaultValue="details">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="details" disabled={isAnalyzing}>
+              <TabsTrigger value="details">
                 Session Details
               </TabsTrigger>
-              <TabsTrigger value="transcript" disabled={isAnalyzing}>
+              <TabsTrigger value="transcript">
                 Transcript
               </TabsTrigger>
-              <TabsTrigger value="analysis" disabled={isAnalyzing}>
+              <TabsTrigger value="analysis">
                 Analysis
               </TabsTrigger>
             </TabsList>
 
             {/* Session Details Tab */}
-            <TabsContent value="details" className="space-y-6">
+            <TabsContent value="details" className="space-y-6 mt-6">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -285,46 +245,29 @@ export default function SessionDetailsPage() {
 
                   {/* Analysis Action */}
                   <div className="space-y-4 pt-4 border-t">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <BarChart3 className="h-4 w-4" />
-                      Session Analysis
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Run or view analysis results for this session
+                      </p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Button 
-                        onClick={() => analysisMutation.mutate()}
-                        disabled={isAnalyzing}
-                        className="flex items-center gap-2"
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <BarChart3 className="h-4 w-4" />
-                            Analyse
-                          </>
-                        )}
-                      </Button>
-                      {isAnalyzing && (
-                        <span className="text-sm text-muted-foreground">
-                          Please wait while we analyze the session...
-                        </span>
-                      )}
-                    </div>
+                    
+                    <AnalysisActionButton 
+                      sessionUid={sessionUid} 
+                      status={session?.status}
+                    />
                   </div>
+
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Transcript Tab */}
-            <TabsContent value="transcript" className="space-y-6">
+            <TabsContent value="transcript" className="mt-6">
               <TranscriptViewer sessionUid={sessionUid} />
             </TabsContent>
 
             {/* Analysis Tab */}
-            <TabsContent value="analysis" className="space-y-6">
+            <TabsContent value="analysis" className="mt-6">
               <AnalysisTab />
             </TabsContent>
           </Tabs>

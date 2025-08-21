@@ -50,6 +50,7 @@ export interface SessionResponse {
   description: string;
   session_date: string;
   recording_link: string;
+  status?: "PENDING" | "STARTED" | "COMPLETED" | "FAILED";
   counselor: {
     uid: string;
     name: string;

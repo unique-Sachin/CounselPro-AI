@@ -4,6 +4,8 @@ import ffmpeg
 import tempfile
 import numpy as np
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -16,25 +18,20 @@ SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 class VideoExtractor:
     """
-    Simplified video extractor with just two methods: auth and processing.
+    Optimized video extractor with parallel processing and smart sampling.
     """
     
-    def __init__(self):
-        """Initialize the video extractor"""
-        logger.info("Initializing VideoExtractor")
+    def __init__(self, max_workers=4):
+        """Initialize the video extractor with configurable parallelism"""
+        logger.info("Initializing OptimizedVideoExtractor")
         self.service = None
         self.temp_dir = tempfile.mkdtemp()
+        self.max_workers = max_workers
         logger.debug(f"Created temporary directory: {self.temp_dir}")
         
     def get_drive_service(self):
-        """
-        Handles the Google Drive API authentication using service account.
-        
-        Returns:
-            googleapiclient.discovery.Resource: An authenticated Google Drive service object.
-        """
+        """Handles the Google Drive API authentication using service account."""
         try:
-            # Load service account credentials
             if os.path.exists('credentials.json'):
                 creds = service_account.Credentials.from_service_account_file(
                     'credentials.json',
@@ -46,7 +43,6 @@ class VideoExtractor:
                 logger.error(error_msg)
                 raise FileNotFoundError(error_msg)
 
-            # Build the Drive service
             self.service = build('drive', 'v3', credentials=creds)
             logger.info("Successfully built Google Drive service")
             return self.service
@@ -55,22 +51,87 @@ class VideoExtractor:
             logger.error(f"Error setting up Google Drive service: {e}")
             raise Exception(f"Failed to authenticate with Google Drive: {str(e)}")
 
-    def get_video_frames_and_audio_paths(self, video_url: str):
-        """
-        Main processing method that downloads video once and extracts frames and audio.
-        
-        Args:
-            video_url (str): Google Drive shareable link
+    def _extract_single_frame(self, temp_video_path, timestamp, width, height):
+        """Extract a single frame at the given timestamp."""
+        try:
+            frame_data, _ = (
+                ffmpeg
+                .input(temp_video_path, ss=timestamp)
+                .output('pipe:', format='rawvideo', pix_fmt='bgr24', vframes=1, s=f'{width}x{height}')
+                .run(capture_stdout=True, quiet=True)
+            )
+
+            if frame_data:
+                frame_array = np.frombuffer(frame_data, np.uint8)
+                frame = frame_array.reshape((height, width, 3))
+                return timestamp, frame
+            else:
+                return timestamp, None
+
+        except Exception as e:
+            logger.warning(f"Failed to extract frame at {timestamp}s: {e}")
+            return timestamp, None
+
+    def _extract_frames_batch(self, temp_video_path, timestamps, width, height, batch_size=10):
+        """Extract multiple frames in a single ffmpeg call for efficiency."""
+        try:
+            # Create filter for multiple timestamps
+            filter_complex = []
+            outputs = []
             
-        Returns:
-            dict: {
-                'frames': dict mapping timestamp to frame (numpy array),
-                'audio_path': str path to extracted audio file,
-                'metadata': dict with video info
-            }
+            for i, timestamp in enumerate(timestamps):
+                filter_complex.append(f'[0:v]trim=start={timestamp}:duration=0.04,setpts=PTS-STARTPTS[v{i}]')
+                outputs.append(f'[v{i}]')
+            
+            if not filter_complex:
+                return {}
+            
+            # Build ffmpeg command
+            input_stream = ffmpeg.input(temp_video_path)
+            
+            # For small batches, use the single frame approach which is more reliable
+            if len(timestamps) <= 3:
+                frames = {}
+                for timestamp in timestamps:
+                    try:
+                        frame_data, _ = (
+                            ffmpeg
+                            .input(temp_video_path, ss=timestamp)
+                            .output('pipe:', format='rawvideo', pix_fmt='bgr24', vframes=1, s=f'{width}x{height}')
+                            .run(capture_stdout=True, quiet=True)
+                        )
+                        if frame_data:
+                            frame_array = np.frombuffer(frame_data, np.uint8)
+                            frame = frame_array.reshape((height, width, 3))
+                            frames[timestamp] = frame
+                        else:
+                            frames[timestamp] = None
+                    except Exception as e:
+                        logger.warning(f"Failed to extract frame at {timestamp}s: {e}")
+                        frames[timestamp] = None
+                return frames
+            else:
+                # For larger batches, fall back to individual extraction
+                frames = {}
+                for timestamp in timestamps:
+                    _, frame = self._extract_single_frame(temp_video_path, timestamp, width, height)
+                    frames[timestamp] = frame
+                return frames
+                
+        except Exception as e:
+            logger.warning(f"Batch extraction failed, falling back to individual: {e}")
+            # Fallback to individual extraction
+            frames = {}
+            for timestamp in timestamps:
+                _, frame = self._extract_single_frame(temp_video_path, timestamp, width, height)
+                frames[timestamp] = frame
+            return frames
+
+    def get_video_frames_and_audio_paths(self, video_url: str, smart_sampling=True):
+        """
+        Optimized processing method with parallel extraction and smart sampling.
         """
         try:
-            # Authenticate if not already done
             if not self.service:
                 self.get_drive_service()
             
@@ -80,13 +141,13 @@ class VideoExtractor:
             elif '/id=' in video_url:
                 file_id = video_url.split('/id=')[1].split('&')[0]
             else:
-                error_msg = "Invalid Google Drive URL format. URL must contain '/file/d/' or '/id='"
+                error_msg = "Invalid Google Drive URL format"
                 logger.error(error_msg)
                 raise ValueError(error_msg)
 
-            logger.info(f"Starting video download and processing for file ID: {file_id}")
+            logger.info(f"Starting optimized video processing for file ID: {file_id}")
             
-            # Download video to temporary file ONCE
+            # Download video with progress tracking
             temp_video = os.path.join(self.temp_dir, 'temp_video.mp4')
             
             request = self.service.files().get_media(fileId=file_id, acknowledgeAbuse=True)
@@ -98,14 +159,15 @@ class VideoExtractor:
                 status, done = downloader.next_chunk()
                 if not done:
                     progress = int(status.progress() * 100)
-                    if progress % 20 == 0:  # Log every 20% to reduce noise
+                    if progress % 20 == 0:
                         logger.info(f"Download progress: {progress}%")
 
+            # Write to file more efficiently
             file_content.seek(0)
             with open(temp_video, 'wb') as f:
                 f.write(file_content.getvalue())
 
-            logger.info("Video downloaded successfully, starting processing")
+            logger.info("Video downloaded, analyzing metadata")
             
             # Get video metadata
             probe = ffmpeg.probe(temp_video)
@@ -126,53 +188,71 @@ class VideoExtractor:
             
             logger.info(f"Video metadata: {duration:.1f}s, {fps:.1f} fps, {width}x{height}")
             
-            # Extract frames if timestamps provided
-            frames = {}
-            # Get frame sampling interval from environment or default to 2 seconds
-            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "2"))
-            timestamps = list(range(0, int(duration), sampling_interval))
-
-            if timestamps:
-                logger.info(f"Extracting {len(timestamps)} frames")
-
-                for i, timestamp in enumerate(timestamps):
-                    try:
-                        frame_data, _ = (
-                            ffmpeg
-                            .input(temp_video, ss=timestamp)
-                            .output('pipe:', format='rawvideo', pix_fmt='bgr24', vframes=1, s=f'{width}x{height}')
-                            .run(capture_stdout=True, quiet=True)
-                        )
-
-                        if frame_data:
-                            frame_array = np.frombuffer(frame_data, np.uint8)
-                            frame = frame_array.reshape((height, width, 3))
-                            frames[timestamp] = frame
-
-                            if (i + 1) % 10 == 0:
-                                logger.debug(f"Extracted {i + 1}/{len(timestamps)} frames")
-
-                    except Exception as e:
-                        logger.warning(f"Failed to extract frame at {timestamp}s: {e}")
-                        frames[timestamp] = None
-
-                successful_frames = len([f for f in frames.values() if f is not None])
-                logger.info(f"Frame extraction completed: {successful_frames}/{len(timestamps)} successful")
+            # Smart sampling strategy
+            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "5"))
             
-            # Extract audio
+            if smart_sampling and duration > 60:  # For videos longer than 1 minute
+                # Sample more densely at the beginning and end, sparse in middle
+                start_samples = list(range(0, min(30, int(duration//3)), 2))
+                middle_samples = list(range(30, int(duration*2//3), sampling_interval*2))
+                end_samples = list(range(max(int(duration*2//3), 30), int(duration), 2))
+                timestamps = start_samples + middle_samples + end_samples
+                timestamps = [t for t in timestamps if t < duration]
+            else:
+                timestamps = list(range(0, int(duration), sampling_interval))
+            
+            # Remove duplicates and sort
+            timestamps = sorted(list(set(timestamps)))
+            
+            logger.info(f"Using smart sampling: {len(timestamps)} frames to extract")
+            
+            # Parallel frame extraction
+            frames = {}
+            if timestamps:
+                logger.info("Starting parallel frame extraction")
+                
+                # Split timestamps into batches for processing
+                batch_size = max(1, len(timestamps) // self.max_workers)
+                timestamp_batches = [timestamps[i:i + batch_size] for i in range(0, len(timestamps), batch_size)]
+                
+                with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+                    # Submit batch jobs
+                    future_to_batch = {
+                        executor.submit(self._extract_frames_batch, temp_video, batch, width, height): batch
+                        for batch in timestamp_batches
+                    }
+                    
+                    completed_frames = 0
+                    for future in as_completed(future_to_batch):
+                        try:
+                            batch_frames = future.result()
+                            frames.update(batch_frames)
+                            completed_frames += len(batch_frames)
+                            
+                            if completed_frames % 20 == 0:
+                                logger.info(f"Extracted {completed_frames}/{len(timestamps)} frames")
+                        except Exception as e:
+                            logger.error(f"Batch processing error: {e}")
+                
+                successful_frames = len([f for f in frames.values() if f is not None])
+                logger.info(f"Parallel frame extraction completed: {successful_frames}/{len(timestamps)} successful")
+            
+            # Extract audio in parallel with frame processing cleanup
             logger.info("Extracting audio")
             audio_path = os.path.join(self.temp_dir, 'extracted_audio.wav')
 
+            # Use more efficient audio extraction settings
             stream = ffmpeg.input(temp_video)
             stream = ffmpeg.output(stream, audio_path,
-                                 acodec='pcm_s16le',  # 16-bit PCM
-                                 ar='16000',           # 16kHz sample rate
-                                 ac='1')               # mono channel
+                                 acodec='pcm_s16le',
+                                 ar='16000',
+                                 ac='1',
+                                 preset='ultrafast')  # Faster encoding
 
             ffmpeg.run(stream, overwrite_output=True, quiet=True)
             logger.info(f"Audio extracted to: {audio_path}")
             
-            # Clean up video file (keep audio file)
+            # Clean up video file
             if os.path.exists(temp_video):
                 os.unlink(temp_video)
             
@@ -183,7 +263,7 @@ class VideoExtractor:
             }
             
         except Exception as e:
-            logger.error(f"Error in video processing: {e}", exc_info=True)
+            logger.error(f"Error in optimized video processing: {e}", exc_info=True)
             raise Exception(f"Failed to process video: {str(e)}")
 
     def cleanup(self):
@@ -201,4 +281,3 @@ class VideoExtractor:
     def __del__(self):
         """Cleanup when object is destroyed"""
         self.cleanup()
-

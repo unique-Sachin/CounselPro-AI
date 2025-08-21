@@ -7,6 +7,12 @@ import {
   PaginationParams 
 } from "@/lib/types";
 
+// Types for session analysis responses
+export interface AnalysisTaskResponse {
+  task_id: string;
+  status: string;
+}
+
 // List sessions with pagination
 export const listSessions = async (params: PaginationParams = { skip: 0, limit: 10 }) => {
   try {
@@ -97,15 +103,13 @@ export const listSessionsByCounselor = async (
   }
 };
 
-// Trigger session analysis
-export const analyzeSession = async (sessionUid: string) => {
+// Trigger session analysis with Celery backend
+export const analyzeSession = async (sessionUid: string): Promise<AnalysisTaskResponse> => {
   try {
-    const response = await apiHelpers.get(`/sessions/${sessionUid}/analysis`, {
-      session_id: sessionUid
-    });
+    const response = await apiHelpers.get<AnalysisTaskResponse>(`/sessions/${sessionUid}/analysis_by_celery`);
     return response.data;
   } catch (error) {
-    console.error("Failed to analyze session:", error);
+    console.error("Failed to start session analysis:", error);
     throw error; // Re-throw to let the UI handle the error
   }
 };
@@ -114,6 +118,7 @@ export const analyzeSession = async (sessionUid: string) => {
 interface RawTranscriptResponse {
   uid: string;
   total_segments: number;
+  status?: "PENDING" | "STARTED" | "COMPLETED" | "FAILED";
   raw_transcript: {
     metadata: {
       chunk_name: string;

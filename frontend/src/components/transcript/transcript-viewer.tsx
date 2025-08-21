@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Clock, FileText, Loader2, BarChart3 } from "lucide-react";
-import { toast } from "sonner";
+import { Search, Clock, FileText, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -12,9 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { getRawTranscript, analyzeSession } from "@/lib/services/sessions";
-import { useAnalysis } from "@/contexts/analysis-context";
+import { getRawTranscript } from "@/lib/services/sessions";
+import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
+import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
 // Types
 interface TranscriptUtterance {
@@ -79,7 +78,6 @@ const getBadgeVariant = (role: string) => {
 export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showOnlyCounselor, setShowOnlyCounselor] = useState(false);
-  const { isAnalyzing: globalIsAnalyzing, setIsAnalyzing, setSessionUid, setAnalysisSource } = useAnalysis();
 
   // Fetch transcript data from API
   const {
@@ -87,50 +85,12 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
     isLoading,
     error,
     isFetching,
-    refetch: refetchTranscript,
   } = useQuery({
     queryKey: ["raw-transcript", sessionUid],
     queryFn: () => getRawTranscript(sessionUid),
     enabled: !!sessionUid,
-    retry: 1, // Only retry once for transcript fetching
-    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
+    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,    
   });
-
-  // Analysis mutation
-  const analysisMutation = useMutation({
-    mutationFn: () => analyzeSession(sessionUid),
-    onMutate: () => {
-      // Set global analysis state when starting
-      setSessionUid(sessionUid);
-      setAnalysisSource('transcript-tab');
-      setIsAnalyzing(true);
-    },
-    onSuccess: () => {
-      toast.success("Analysis Completed", {
-        description: "Session analysis has been completed successfully. Fetching transcript...",
-      });
-      // Refetch transcript data after successful analysis
-      setTimeout(() => {
-        refetchTranscript();
-      }, 3000); // Wait 3 seconds for analysis to process and generate transcript
-      // Release global lock
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
-    },
-    onError: (error) => {
-      console.error("Analysis failed:", error);
-      toast.error("Analysis Failed", {
-        description: "Failed to analyze the session. Please try again.",
-      });
-      // Release global lock on error
-      setIsAnalyzing(false);
-      setSessionUid(null);
-      setAnalysisSource(null);
-    },
-  });
-
-  const isAnalyzing = analysisMutation.isPending || globalIsAnalyzing;
 
   // Extract transcript data from API response or use passed data (for backward compatibility)  
   const currentData = transcriptResponse?.raw_transcript || data;
@@ -227,162 +187,50 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
     );
   }
 
-  // Show analyzing overlay when analysis is running
-  if (isAnalyzing) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="relative"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Analyzing Session
-            </CardTitle>
-            <CardDescription>
-              Please wait while we analyze the session and generate transcript...
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <motion.div 
-              className="text-center py-16"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <motion.div 
-                className="mx-auto w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-6"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              >
-                <BarChart3 className="w-12 h-12 text-primary" />
-              </motion.div>
-              <motion.div 
-                className="space-y-3"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-              >
-                <h3 className="text-xl font-semibold">Analysis in Progress</h3>
-                <p className="text-muted-foreground max-w-md mx-auto">
-                  We&apos;re analyzing the session content to generate insights and transcript. 
-                  This may take a few minutes.
-                </p>
-                <motion.div 
-                  className="flex items-center justify-center gap-2 mt-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3, delay: 0.5 }}
-                >
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm text-muted-foreground">Processing...</span>
-                </motion.div>
-              </motion.div>
-            </motion.div>
-          </CardContent>
-        </Card>
-      </motion.div>
-    );
-  }
-
   // Show error state if fetch failed (optional, can be removed to show placeholder instead)
   if (error) {
     console.warn("Transcript fetch failed:", error);
   }
 
-  // If no data available (either failed to fetch or no transcript exists), show placeholder
-  if (!currentData) {
+  // Check if analysis status is not COMPLETED - show analysis action button
+  if (transcriptResponse?.status && transcriptResponse.status !== "COMPLETED") {
     return (
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
+        className="space-y-6"
       >
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Transcript
+              Session Transcript
             </CardTitle>
             <CardDescription>
-              Session transcript will appear here after analysis
+              Transcript will be available after session analysis is completed
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <motion.div 
-              className="text-center py-12"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-            >
-              <motion.div 
-                className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.2 }}
-              >
-                <FileText className="w-12 h-12 text-muted-foreground" />
-              </motion.div>
-              <motion.div 
-                className="space-y-4"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: 0.3 }}
-              >
-                <h3 className="text-lg font-semibold">Transcript not available yet</h3>
-                <p className="text-muted-foreground max-w-sm mx-auto">
-                  Please analyse the session to view transcript.
-                </p>
-                
-                {/* Analyse Button */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.4 }}
-                >
-                  <Button 
-                    onClick={() => analysisMutation.mutate()}
-                    disabled={isAnalyzing}
-                    className="flex items-center gap-2"
-                    size="lg"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Analyzing...
-                      </>
-                    ) : (
-                      <>
-                        <BarChart3 className="h-4 w-4" />
-                        Analyse
-                      </>
-                    )}
-                  </Button>
-                  {isAnalyzing && (
-                    <motion.p 
-                      className="text-sm text-muted-foreground mt-2"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      Please wait while we analyze the session...
-                    </motion.p>
-                  )}
-                </motion.div>
-              </motion.div>
-            </motion.div>
+            <AnalysisActionButton 
+              sessionUid={sessionUid} 
+              status={transcriptResponse.status}
+              className="pt-4 border-t"
+            />
           </CardContent>
         </Card>
       </motion.div>
     );
   }
 
+  // If no data available (either failed to fetch or no transcript exists), show empty state
+  if (!currentData) {
+    return <AnalysisEmptyState sessionUid={sessionUid} source="transcript-tab" />;
+  }
+
   return (
     <motion.div 
-      className={`space-y-6 ${isLoading || isAnalyzing ? 'pointer-events-none' : ''}`}
+      className="space-y-6"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
@@ -393,12 +241,12 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.1 }}
       >
-        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Transcript Controls
-            {(isFetching && !isLoading) || isAnalyzing ? (
+            {(isFetching && !isLoading) ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : null}
           </CardTitle>
@@ -440,11 +288,11 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.4, delay: 0.2 }}
       >
-        <Card className={`${isLoading || isAnalyzing ? 'relative overflow-hidden' : ''}`}>
+        <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             Conversation
-            {(isFetching && !isLoading) || isAnalyzing ? (
+            {(isFetching && !isLoading) ? (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             ) : null}
           </CardTitle>

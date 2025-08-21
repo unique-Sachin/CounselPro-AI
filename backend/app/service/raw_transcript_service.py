@@ -6,10 +6,12 @@ from sqlalchemy.orm import joinedload
 
 from app.models.raw_transcript import RawTranscript
 from app.models.session import CounselingSession
+from app.models.session_analysis import SessionAnalysis
 from app.schemas.raw_transcript_schema import (
     RawTranscriptCreate,
     RawTranscriptUpdate,
     RawTranscriptResponse,
+    RawTranscriptWithStatusResponse,
 )
 from app.exceptions.custom_exception import (
     BaseAppException,
@@ -125,10 +127,80 @@ async def get_raw_transcript_by_uid(
         )
 
 
-async def get_raw_transcript_by_session_uid(
+# async def get_raw_transcript_by_session_uid(
+#     db: AsyncSession, session_uid: str
+# ) -> RawTranscriptResponse:
+#     try:
+#         stmt = (
+#             select(RawTranscript)
+#             .join(RawTranscript.session)
+#             .options(
+#                 joinedload(RawTranscript.session).joinedload(
+#                     CounselingSession.counselor
+#                 )
+#             )
+#             .where(CounselingSession.uid == session_uid)
+#         )
+#         result = await db.execute(stmt)
+#         transcript = result.scalar_one_or_none()
+
+#         if not transcript:
+#             raise NotFoundException(
+#                 details=f"No transcript found for session {session_uid}"
+#             )
+
+#         return RawTranscriptResponse(
+#             uid=transcript.uid,
+#             total_segments=transcript.total_segments,
+#             raw_transcript=transcript.raw_transcript,
+#             created_at=transcript.created_at,
+#             updated_at=transcript.updated_at,
+#             session=transcript.session,
+#         )
+
+#     except SQLAlchemyError as e:
+#         raise BaseAppException(
+#             error="Database Error",
+#             details=str(e),
+#             status_code=500,
+#         )
+
+
+async def get_raw_transcript_by_session_uid_with_status(
     db: AsyncSession, session_uid: str
-) -> RawTranscriptResponse:
+) -> RawTranscriptWithStatusResponse:
+    """
+    Get raw transcript by session UID, but only return full data if analysis is completed.
+    Returns status and empty data if analysis is not completed.
+    """
     try:
+        # First, check the session analysis status
+        analysis_stmt = (
+            select(SessionAnalysis)
+            .join(SessionAnalysis.session)
+            .where(CounselingSession.uid == session_uid)
+        )
+        analysis_result = await db.execute(analysis_stmt)
+        analysis = analysis_result.scalar_one_or_none()
+        
+        # Get status
+        status = "PENDING"  # Default status
+        if analysis and hasattr(analysis, 'status'):
+            status = analysis.status.value if hasattr(analysis.status, 'value') else str(analysis.status)
+        
+        # If analysis is not completed, return only status with empty data
+        if status != "COMPLETED":
+            return RawTranscriptWithStatusResponse(
+                status=status,
+                uid=None,
+                total_segments=None,
+                raw_transcript=None,
+                created_at=None,
+                updated_at=None,
+                session=None
+            )
+        
+        # If completed, get and return full transcript data
         stmt = (
             select(RawTranscript)
             .join(RawTranscript.session)
@@ -143,12 +215,20 @@ async def get_raw_transcript_by_session_uid(
         transcript = result.scalar_one_or_none()
 
         if not transcript:
-            raise NotFoundException(
-                details=f"No transcript found for session {session_uid}"
+            # Analysis is completed but no transcript found
+            return RawTranscriptWithStatusResponse(
+                status=status,
+                uid=None,
+                total_segments=None,
+                raw_transcript=None,
+                created_at=None,
+                updated_at=None,
+                session=None
             )
 
-        return RawTranscriptResponse(
-            uid=transcript.uid,
+        return RawTranscriptWithStatusResponse(
+            status=status,
+            uid=str(transcript.uid),
             total_segments=transcript.total_segments,
             raw_transcript=transcript.raw_transcript,
             created_at=transcript.created_at,
@@ -158,9 +238,7 @@ async def get_raw_transcript_by_session_uid(
 
     except SQLAlchemyError as e:
         raise BaseAppException(
-            error="Database Error",
-            details=str(e),
-            status_code=500,
+            error="Database Error", details=str(e), status_code=500
         )
 
 
