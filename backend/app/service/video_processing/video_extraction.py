@@ -128,8 +128,7 @@ class VideoExtractor:
             
             # Extract frames if timestamps provided
             frames = {}
-            # Get frame sampling interval from environment or default to 2 seconds
-            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "2"))
+            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "5"))
             timestamps = list(range(0, int(duration), sampling_interval))
 
             if timestamps:
