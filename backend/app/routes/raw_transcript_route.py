@@ -12,7 +12,6 @@ from app.schemas.raw_transcript_schema import (
 from app.service.raw_transcript_service import (
     create_raw_transcript,
     get_raw_transcript_by_uid,
-    get_raw_transcript_by_session_uid,
     get_raw_transcript_by_session_uid_with_status,
     update_raw_transcript,
     delete_raw_transcript,

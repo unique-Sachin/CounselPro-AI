@@ -61,6 +61,7 @@ def process_video_background(session_uid: UUID, recording_link: str):
                 transcript_data = transcriber.transcribe_chunk(
                     audio_path, str(session_uid)
                 )
+                print(transcript_data)
                 print("Transcription completed successfully")
             except Exception as transcription_error:
                 print(f"Warning: Transcription failed: {transcription_error}")
@@ -76,6 +77,13 @@ def process_video_background(session_uid: UUID, recording_link: str):
 
         print(f"Video processing completed for session {session_uid}")
 
+        # Cleanup after successful completion
+        # try:
+        #     if extraction:
+        #         extraction.cleanup()
+        # except Exception as cleanup_error:
+        #     logger.warning(f"Error during cleanup: {cleanup_error}")
+
         # ✅ Return all results to Celery task
         return {
             "video_analysis_data": video_analysis_data,
@@ -85,14 +93,13 @@ def process_video_background(session_uid: UUID, recording_link: str):
 
     except Exception as e:
         logger.error(f"Error processing video for session {session_uid}: {e}")
-        raise
-
-    finally:
+        # Cleanup on error
         try:
             if extraction:
                 extraction.cleanup()
         except Exception as cleanup_error:
             logger.warning(f"Error during cleanup: {cleanup_error}")
+        raise
 
 
 def create_or_update_session_analysis(

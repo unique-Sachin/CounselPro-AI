@@ -127,43 +127,43 @@ async def get_raw_transcript_by_uid(
         )
 
 
-async def get_raw_transcript_by_session_uid(
-    db: AsyncSession, session_uid: str
-) -> RawTranscriptResponse:
-    try:
-        stmt = (
-            select(RawTranscript)
-            .join(RawTranscript.session)
-            .options(
-                joinedload(RawTranscript.session).joinedload(
-                    CounselingSession.counselor
-                )
-            )
-            .where(CounselingSession.uid == session_uid)
-        )
-        result = await db.execute(stmt)
-        transcript = result.scalar_one_or_none()
+# async def get_raw_transcript_by_session_uid(
+#     db: AsyncSession, session_uid: str
+# ) -> RawTranscriptResponse:
+#     try:
+#         stmt = (
+#             select(RawTranscript)
+#             .join(RawTranscript.session)
+#             .options(
+#                 joinedload(RawTranscript.session).joinedload(
+#                     CounselingSession.counselor
+#                 )
+#             )
+#             .where(CounselingSession.uid == session_uid)
+#         )
+#         result = await db.execute(stmt)
+#         transcript = result.scalar_one_or_none()
 
-        if not transcript:
-            raise NotFoundException(
-                details=f"No transcript found for session {session_uid}"
-            )
+#         if not transcript:
+#             raise NotFoundException(
+#                 details=f"No transcript found for session {session_uid}"
+#             )
 
-        return RawTranscriptResponse(
-            uid=transcript.uid,
-            total_segments=transcript.total_segments,
-            raw_transcript=transcript.raw_transcript,
-            created_at=transcript.created_at,
-            updated_at=transcript.updated_at,
-            session=transcript.session,
-        )
+#         return RawTranscriptResponse(
+#             uid=transcript.uid,
+#             total_segments=transcript.total_segments,
+#             raw_transcript=transcript.raw_transcript,
+#             created_at=transcript.created_at,
+#             updated_at=transcript.updated_at,
+#             session=transcript.session,
+#         )
 
-    except SQLAlchemyError as e:
-        raise BaseAppException(
-            error="Database Error",
-            details=str(e),
-            status_code=500,
-        )
+#     except SQLAlchemyError as e:
+#         raise BaseAppException(
+#             error="Database Error",
+#             details=str(e),
+#             status_code=500,
+#         )
 
 
 async def get_raw_transcript_by_session_uid_with_status(
