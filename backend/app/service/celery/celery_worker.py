@@ -12,7 +12,6 @@ from app.schemas.session_analysis_schema import SessionAnalysisCreate
 from app.service.celery.video_processing_for_celery import (
     create_or_update_raw_transcript,
     create_or_update_session_analysis,
-    create_raw_transcript,
 )
 from app.service.celery.video_processing_for_celery import process_video_background
 from app.db.database import SyncSessionLocal
@@ -62,13 +61,7 @@ def process_video(session_uid: str, video_path: str):
             db.commit()
 
         # ---- Run pure video processing ----
-        results = process_video_background(session_uid, video_path)
-        print()
-        print("=" * 200)
-        print("Results:", results)
-        print("=" * 200)
-        print()
-        # print(results.get("transcript_data"))
+        results = process_video_background(uuid.UUID(session_uid), video_path)
 
         # ---- Save transcript ----
         if results.get("transcript_data"):

@@ -1,12 +1,13 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { AlertTriangle, BarChart3, Loader2 } from "lucide-react";
-import { useSessionAnalysis } from "@/lib/services/analysis";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { useSessionAnalysisWithPolling } from "@/lib/services/analysis";
 import AnalysisDashboard from "@/components/analysis/analysis-dashboard";
+import AnalysisEmptyState from "@/components/analysis/analysis-empty-state";
+import { AnalysisActionButton } from "@/components/analysis/analysis-action-button";
 
 export default function AnalysisTab() {
   const params = useParams();
@@ -17,9 +18,8 @@ export default function AnalysisTab() {
     isLoading,
     error,
     isError,
-  } = useSessionAnalysis(sessionUid, {
-    staleTime: 30_000,
-    retry: 1,
+  } = useSessionAnalysisWithPolling(sessionUid, {
+    pollingInterval: 5000, // Poll every 5 seconds when status is PENDING/STARTED
   });
 
   // Loading state
@@ -79,65 +79,35 @@ export default function AnalysisTab() {
     );
   }
 
-  // Error state
-  if (isError || error) {
-    return (
-      <div className="space-y-6">
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            {error instanceof Error 
-              ? `Failed to load session analysis: ${error.message}`
-              : "Failed to load session analysis. The analysis may not be available yet or there was an error processing the request."
-            }
-          </AlertDescription>
-        </Alert>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground mb-2">Analysis Not Available</p>
-              <p className="text-sm text-muted-foreground">
-                This session has not been analyzed yet, or the analysis failed to complete.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // Error state (404, empty, or other errors)
+  if (isError || error || !analysisData) {
+    return <AnalysisEmptyState sessionUid={sessionUid} source="session-details" />;
   }
 
-  // No data state
-  if (!analysisData) {
+  // Check if analysis status is not COMPLETED - show analysis action button
+  if (analysisData.status && analysisData.status !== "COMPLETED") {
     return (
-      <div className="space-y-6">
-        <Alert>
-          <BarChart3 className="h-4 w-4" />
-          <AlertDescription>
-            No analysis data is available for this session. The session may need to be analyzed first.
-          </AlertDescription>
-        </Alert>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                <BarChart3 className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <p className="text-muted-foreground mb-2">No Analysis Data</p>
-              <p className="text-sm text-muted-foreground">
-                Please run an analysis on this session first to see the results here.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Loader2 className="h-5 w-5" />
+            Session Analysis
+          </CardTitle>
+          <CardDescription>
+            Analysis results will be available after processing is completed
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AnalysisActionButton 
+            sessionUid={sessionUid} 
+            status={analysisData.status}
+            className="pt-4 border-t"
+          />
+        </CardContent>
+      </Card>
     );
   }
 
   // Success state - show the analysis dashboard
-  return <AnalysisDashboard analysisData={analysisData} />;
+  return <AnalysisDashboard analysisData={analysisData} uid={sessionUid} />;
 }

@@ -38,6 +38,7 @@ class SessionResponse(BaseModel):
     description: str
     session_date: datetime
     recording_link: HttpUrl
+    status: str  # Analysis status
     counselor: CounselorInfo  # nested counselor info
 
 

@@ -7,11 +7,12 @@ from app.schemas.raw_transcript_schema import (
     RawTranscriptCreate,
     RawTranscriptUpdate,
     RawTranscriptResponse,
+    RawTranscriptWithStatusResponse,
 )
 from app.service.raw_transcript_service import (
     create_raw_transcript,
     get_raw_transcript_by_uid,
-    get_raw_transcript_by_session_uid,
+    get_raw_transcript_by_session_uid_with_status,
     update_raw_transcript,
     delete_raw_transcript,
 )
@@ -37,14 +38,16 @@ async def get_transcript(transcript_uid: str, db: AsyncSession = Depends(get_asy
     return await get_raw_transcript_by_uid(db, transcript_uid)
 
 
-@router.get("/by-session/{session_uid}", response_model=RawTranscriptResponse)
+@router.get("/by-session/{session_uid}", response_model=RawTranscriptWithStatusResponse)
 async def get_transcript_by_session(
     session_uid: str, db: AsyncSession = Depends(get_async_db)
 ):
     """
     Get a raw transcript by its associated session UID.
+    Returns full transcript data only if analysis status is 'COMPLETED',
+    otherwise returns status with empty data.
     """
-    return await get_raw_transcript_by_session_uid(db, session_uid)
+    return await get_raw_transcript_by_session_uid_with_status(db, session_uid)
 
 
 @router.put("/{transcript_uid}", response_model=RawTranscriptResponse)

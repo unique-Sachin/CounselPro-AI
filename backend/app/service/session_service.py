@@ -59,10 +59,11 @@ async def create_session(
 
         # 3. Return response with counselor info
         return SessionResponse(
-            uid=new_session.uid,
+            uid=str(new_session.uid),
             description=new_session.description,
             session_date=new_session.session_date,
             recording_link=new_session.recording_link,
+            status="PENDING",  # New sessions start as PENDING
             counselor=CounselorInfo(uid=str(counselor.uid), name=counselor.name),
         )
 
@@ -80,17 +81,24 @@ async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionRespo
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
+            .options(joinedload(CounselingSession.analysis))
             .filter(CounselingSession.uid == session_uid)
         )
         session = result.scalars().first()
         if not session:
             raise NotFoundException(details=f"Session {session_uid} not found")
 
+        # Get analysis status
+        status = "PENDING"  # Default status
+        if session.analysis and hasattr(session.analysis, 'status'):
+            status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+
         return SessionResponse(
-            uid=session.uid,
+            uid=str(session.uid),
             description=session.description,
             session_date=session.session_date,
             recording_link=session.recording_link,
+            status=status,
             counselor=CounselorInfo(
                 uid=str(session.counselor.uid), name=session.counselor.name
             ),
@@ -116,10 +124,11 @@ def get_session_by_id_sync(db: Session, session_uid: UUID) -> SessionResponse:
             raise NotFoundException(details=f"Session {session_uid} not found")
 
         return SessionResponse(
-            uid=session.uid,
+            uid=str(session.uid),
             description=session.description,
             session_date=session.session_date,
             recording_link=session.recording_link,
+            status="PENDING",  # Default for sync version
             counselor=CounselorInfo(
                 uid=str(session.counselor.uid), name=session.counselor.name
             ),
@@ -157,6 +166,7 @@ async def get_sessions_by_counselor(
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
+            .options(joinedload(CounselingSession.analysis))
             .filter(CounselingSession.counselor_id == counselor.id)
             .offset(skip)
             .limit(limit)
@@ -164,19 +174,24 @@ async def get_sessions_by_counselor(
         sessions = result.scalars().all()
 
         # Format the response
-        items = [
-            SessionResponse(
-                uid=session.uid,
+        items = []
+        for session in sessions:
+            # Get analysis status
+            status = "PENDING"  # Default status
+            if session.analysis and hasattr(session.analysis, 'status'):
+                status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+            
+            items.append(SessionResponse(
+                uid=str(session.uid),
                 description=session.description,
                 session_date=session.session_date,
                 recording_link=session.recording_link,
+                status=status,
                 counselor=CounselorInfo(
-                    uid=session.counselor.uid,
+                    uid=str(session.counselor.uid),
                     name=session.counselor.name,
                 ),
-            )
-            for session in sessions
-        ]
+            ))
 
         return items, total
 
@@ -194,29 +209,36 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
         total_result = await db.execute(select(CounselingSession))
         total = len(total_result.scalars().all())
 
-        # Fetch paginated sessions with their counselors
+        # Fetch paginated sessions with their counselors and analysis
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
+            .options(joinedload(CounselingSession.analysis))
             .offset(skip)
             .limit(limit)
         )
         sessions = result.scalars().all()
 
         # Format the response
-        items = [
-            SessionResponse(
-                uid=session.uid,
+        items = []
+        for session in sessions:
+            # Get analysis status
+            status = "PENDING"  # Default status
+            if session.analysis and hasattr(session.analysis, 'status'):
+                status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+            
+            items.append(SessionResponse(
+                uid=str(session.uid),
                 description=session.description,
                 session_date=session.session_date,
                 recording_link=session.recording_link,
+                status=status,
                 counselor=CounselorInfo(
-                    uid=session.counselor.uid,
+                    uid=str(session.counselor.uid),
                     name=session.counselor.name,
                 ),
-            )
-            for session in sessions
-        ]
+            ))
+        
         return items, total
 
     except SQLAlchemyError as e:
@@ -230,10 +252,11 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
 async def update_session(
     db: AsyncSession, session_uid: str, session_in: SessionUpdate
 ) -> SessionResponse:
-    # Get session with counselor eagerly loaded
+    # Get session with counselor and analysis eagerly loaded
     result = await db.execute(
         select(CounselingSession)
         .options(joinedload(CounselingSession.counselor))
+        .options(joinedload(CounselingSession.analysis))
         .filter(CounselingSession.uid == session_uid)
     )
     session = result.scalars().first()
@@ -250,13 +273,19 @@ async def update_session(
         await db.commit()
         await db.refresh(session)
 
+        # Get analysis status
+        status = "PENDING"  # Default status
+        if session.analysis and hasattr(session.analysis, 'status'):
+            status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+
         return SessionResponse(
-            uid=session.uid,
+            uid=str(session.uid),
             description=session.description,
             session_date=session.session_date,
             recording_link=session.recording_link,
+            status=status,
             counselor=CounselorInfo(
-                uid=session.counselor.uid,
+                uid=str(session.counselor.uid),
                 name=session.counselor.name,
             ),
         )
@@ -271,7 +300,7 @@ async def update_session(
 
 
 async def delete_session(db: AsyncSession, session_uid: str):
-    session = await get_session_by_id(db, session_uid)
+    session = await get_session_by_id(db, UUID(session_uid))
     try:
         await db.delete(session)
         await db.commit()

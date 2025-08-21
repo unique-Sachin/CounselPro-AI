@@ -7,6 +7,7 @@ import { Plus, Calendar, Search, ChevronLeft, ChevronRight } from "lucide-react"
 
 import { PageTransition } from "@/components/page-transition";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -75,6 +76,24 @@ export default function SessionsPage() {
 
   const handleNextPage = () => {
     setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  };
+
+  // Status badge helper
+  const getStatusBadge = (status?: "PENDING" | "STARTED" | "COMPLETED" | "FAILED") => {
+    if (!status) return <Badge variant="outline">Unknown</Badge>;
+    
+    switch (status) {
+      case "COMPLETED":
+        return <Badge variant="default">Completed</Badge>;
+      case "STARTED":
+        return <Badge variant="secondary">Processing</Badge>;
+      case "PENDING":
+        return <Badge variant="outline">Pending</Badge>;
+      case "FAILED":
+        return <Badge variant="destructive">Failed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   const handleCounselorChange = (value: string) => {
@@ -207,11 +226,14 @@ export default function SessionsPage() {
                         </span>
                       </div>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/sessions/${session.uid}`}>
-                        View Details
-                      </Link>
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      {getStatusBadge(session.status)}
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/sessions/${session.uid}`}>
+                          View Details
+                        </Link>
+                      </Button>
+                    </div>
                   </motion.div>
                 ))}
               </div>
