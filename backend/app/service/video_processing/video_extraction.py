@@ -189,7 +189,7 @@ class VideoExtractor:
             logger.info(f"Video metadata: {duration:.1f}s, {fps:.1f} fps, {width}x{height}")
             
             # Smart sampling strategy
-            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "5"))
+            sampling_interval = int(os.getenv("FRAME_SAMPLING_INTERVAL", "60"))
             
             if smart_sampling and duration > 60:  # For videos longer than 1 minute
                 # Sample more densely at the beginning and end, sparse in middle
