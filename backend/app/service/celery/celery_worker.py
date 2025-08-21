@@ -17,6 +17,8 @@ from app.service.celery.video_processing_for_celery import process_video_backgro
 from app.db.database import SyncSessionLocal
 from sqlalchemy.orm import joinedload
 
+from app.service.email_service import send_simple_email_template
+
 load_dotenv()
 
 celery_app = Celery(
@@ -84,6 +86,9 @@ def process_video(session_uid: str, video_path: str):
         analysis_entry.status = AnalysisStatus.COMPLETED
         db.commit()
         print(f"Session analysis saved/updated with UID: {saved_analysis.uid}")
+
+        # Send email notification
+        send_simple_email_template(db, session_uid)
 
     except Exception as e:
         print(f"Error processing video: {e}")
