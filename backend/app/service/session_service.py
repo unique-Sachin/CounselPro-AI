@@ -1,6 +1,8 @@
 import logging
 import json
 from uuid import UUID
+
+from sqlalchemy import desc
 from app.service.session_analysis_service import create_or_update_session_analysis
 from app.schemas.session_analysis_schema import SessionAnalysisCreate
 from app.service.video_processing.video_processing import VideoProcessor
@@ -158,6 +160,7 @@ async def get_sessions_by_counselor(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
             .filter(CounselingSession.counselor_id == counselor.id)
+            .order_by(desc(CounselingSession.id))
             .offset(skip)
             .limit(limit)
         )
@@ -198,6 +201,7 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
+            .order_by(desc(CounselingSession.id))
             .offset(skip)
             .limit(limit)
         )

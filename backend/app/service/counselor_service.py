@@ -1,4 +1,5 @@
 import logging
+from sqlalchemy import desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -92,7 +93,7 @@ async def get_all_counselors(db: AsyncSession, skip: int = 0, limit: int = 10):
         total = len(total_result.scalars().all())
 
         # Get paginated items
-        query = select(Counselor).offset(skip).limit(limit)
+        query = select(Counselor).order_by(desc(Counselor.id)).offset(skip).limit(limit)
         result = await db.execute(query)
         counselors = result.scalars().all()
         return counselors, total

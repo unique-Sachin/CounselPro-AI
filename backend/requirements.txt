@@ -27,7 +27,6 @@ email-validator
 python-multipart
 python-dotenv
 requests
-psycopg2
 
 # Audio Processing & Transcription
 deepgram-sdk
