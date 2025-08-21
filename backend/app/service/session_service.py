@@ -1,6 +1,8 @@
 import logging
 import json
 from uuid import UUID
+
+from sqlalchemy import desc
 from app.service.session_analysis_service import create_or_update_session_analysis
 from app.schemas.session_analysis_schema import SessionAnalysisCreate
 from app.service.video_processing.video_processing import VideoProcessor
@@ -90,8 +92,12 @@ async def get_session_by_id(db: AsyncSession, session_uid: UUID) -> SessionRespo
 
         # Get analysis status
         status = "PENDING"  # Default status
-        if session.analysis and hasattr(session.analysis, 'status'):
-            status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+        if session.analysis and hasattr(session.analysis, "status"):
+            status = (
+                session.analysis.status.value
+                if hasattr(session.analysis.status, "value")
+                else str(session.analysis.status)
+            )
 
         return SessionResponse(
             uid=str(session.uid),
@@ -168,6 +174,7 @@ async def get_sessions_by_counselor(
             .options(joinedload(CounselingSession.counselor))
             .options(joinedload(CounselingSession.analysis))
             .filter(CounselingSession.counselor_id == counselor.id)
+            .order_by(desc(CounselingSession.id))
             .offset(skip)
             .limit(limit)
         )
@@ -178,20 +185,26 @@ async def get_sessions_by_counselor(
         for session in sessions:
             # Get analysis status
             status = "PENDING"  # Default status
-            if session.analysis and hasattr(session.analysis, 'status'):
-                status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
-            
-            items.append(SessionResponse(
-                uid=str(session.uid),
-                description=session.description,
-                session_date=session.session_date,
-                recording_link=session.recording_link,
-                status=status,
-                counselor=CounselorInfo(
-                    uid=str(session.counselor.uid),
-                    name=session.counselor.name,
-                ),
-            ))
+            if session.analysis and hasattr(session.analysis, "status"):
+                status = (
+                    session.analysis.status.value
+                    if hasattr(session.analysis.status, "value")
+                    else str(session.analysis.status)
+                )
+
+            items.append(
+                SessionResponse(
+                    uid=str(session.uid),
+                    description=session.description,
+                    session_date=session.session_date,
+                    recording_link=session.recording_link,
+                    status=status,
+                    counselor=CounselorInfo(
+                        uid=str(session.counselor.uid),
+                        name=session.counselor.name,
+                    ),
+                )
+            )
 
         return items, total
 
@@ -213,6 +226,7 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
         result = await db.execute(
             select(CounselingSession)
             .options(joinedload(CounselingSession.counselor))
+            .order_by(desc(CounselingSession.id))
             .options(joinedload(CounselingSession.analysis))
             .offset(skip)
             .limit(limit)
@@ -224,21 +238,27 @@ async def get_all_sessions(db: AsyncSession, skip: int = 0, limit: int = 10):
         for session in sessions:
             # Get analysis status
             status = "PENDING"  # Default status
-            if session.analysis and hasattr(session.analysis, 'status'):
-                status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
-            
-            items.append(SessionResponse(
-                uid=str(session.uid),
-                description=session.description,
-                session_date=session.session_date,
-                recording_link=session.recording_link,
-                status=status,
-                counselor=CounselorInfo(
-                    uid=str(session.counselor.uid),
-                    name=session.counselor.name,
-                ),
-            ))
-        
+            if session.analysis and hasattr(session.analysis, "status"):
+                status = (
+                    session.analysis.status.value
+                    if hasattr(session.analysis.status, "value")
+                    else str(session.analysis.status)
+                )
+
+            items.append(
+                SessionResponse(
+                    uid=str(session.uid),
+                    description=session.description,
+                    session_date=session.session_date,
+                    recording_link=session.recording_link,
+                    status=status,
+                    counselor=CounselorInfo(
+                        uid=str(session.counselor.uid),
+                        name=session.counselor.name,
+                    ),
+                )
+            )
+
         return items, total
 
     except SQLAlchemyError as e:
@@ -275,8 +295,12 @@ async def update_session(
 
         # Get analysis status
         status = "PENDING"  # Default status
-        if session.analysis and hasattr(session.analysis, 'status'):
-            status = session.analysis.status.value if hasattr(session.analysis.status, 'value') else str(session.analysis.status)
+        if session.analysis and hasattr(session.analysis, "status"):
+            status = (
+                session.analysis.status.value
+                if hasattr(session.analysis.status, "value")
+                else str(session.analysis.status)
+            )
 
         return SessionResponse(
             uid=str(session.uid),

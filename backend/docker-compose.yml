@@ -1,0 +1,91 @@
+version: "3.9"
+
+services:
+  backend:
+    build: .
+    container_name: counselpro-backend
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./assets:/app/assets
+      - ./credentials.json:/app/credentials.json
+      - ./.env:/app/.env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
+
+  celery:
+    build: .
+    container_name: counselpro-celery
+    env_file:
+      - .env
+    volumes:
+      - ./app:/app/app
+      - ./assets:/app/assets
+      - ./credentials.json:/app/credentials.json
+      - ./.env:/app/.env
+    depends_on:
+      - backend
+      - redis
+      - db
+    command:
+      [
+        "celery",
+        "-A",
+        "app.service.celery.celery_worker.celery_app",
+        "worker",
+        "--loglevel=info",
+      ]
+
+  flower:
+    build: .
+    container_name: counselpro-flower
+    env_file:
+      - .env
+    depends_on:
+      - celery
+      - redis
+    ports:
+      - "5555:5555"
+    command:
+      [
+        "celery",
+        "-A",
+        "app.service.celery.celery_worker.celery_app",
+        "flower",
+        "--port=5555",
+      ]
+
+  redis:
+    image: redis:7-alpine
+    container_name: counselpro-redis
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:15-alpine
+    container_name: counselpro-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: counselpro_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - counselpro-db-data:/var/lib/postgresql/data
+
+volumes:
+  counselpro-db-data:
