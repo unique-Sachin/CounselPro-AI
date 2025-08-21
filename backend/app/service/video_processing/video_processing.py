@@ -17,7 +17,6 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 # Constants
-FRAME_SAMPLING_INTERVAL = int(os.getenv("FRAME_SAMPLING_INTERVAL", "2"))
 MIN_OFF_PERIOD_DURATION = int(os.getenv("MIN_OFF_PERIOD_DURATION", "6"))
 MAX_EMBEDDING_HISTORY = 5  # Number of face images to keep per person
 
@@ -237,7 +236,7 @@ class VideoProcessor:
         self, frames_data: dict, duration: float, fps: float
     ):
         """
-        Analyzes camera status from pre-extracted frames using DeepFace.
+        Analyzes camera status from pre-extracted frames using DeepFace
         
         Detects faces, performs anti-spoofing, and tracks individual people
         across frames using face recognition.
@@ -274,102 +273,56 @@ class VideoProcessor:
                 current_persons = set()  # Track active persons in this frame
 
                 try:
-                    # Use DeepFace for face detection with facial area information
-                    analysis_results = DeepFace.analyze(
+                    # OPTIMIZED: Use DeepFace.extract_faces() for faster face detection only
+                    face_objs = DeepFace.extract_faces(
                         img_path=frame,
-                        actions=['emotion'],  # Minimal analysis to get face regions
                         enforce_detection=False,
-                        silent=True
+                        detector_backend='yolov8',  # Fastest detector
+                        anti_spoofing=True
                     )
-                    
-                    # Handle both single face and multiple faces
-                    if not isinstance(analysis_results, list):
-                        analysis_results = [analysis_results]
 
-                    if analysis_results:
-                        for result in analysis_results:
-                            # Get facial area coordinates - DeepFace provides 'region' key
-                            region = result.get("region", {})
-                            x = region.get("x", 0)
-                            y = region.get("y", 0)
-                            w = region.get("w", 0)
-                            h = region.get("h", 0)
+                    if face_objs:
+                        for i, face_obj in enumerate(face_objs):
+                            # Check if face is real (anti-spoofing)
+                            is_real = face_obj.get("is_real", True)
                             
-                            if w > 0 and h > 0:  # Valid face detection
-                                # Extract face region from original frame
-                                face_region = frame[y:y+h, x:x+w]
+                            if is_real:
+                                # Get face image from face_obj
+                                face_img_normalized = face_obj.get("face", None)
+                                if face_img_normalized is None:
+                                    continue
                                 
-                                # Anti-spoofing check using DeepFace's extract_faces with anti_spoofing
-                                try:
-                                    face_objs = DeepFace.extract_faces(
-                                        img_path=face_region,
-                                        enforce_detection=False,
-                                        anti_spoofing=True
-                                    )
-                                    is_real = face_objs[0].get("is_real", True) if face_objs else True
-                                except:
-                                    is_real = True  # Default to real if anti-spoofing fails
+                                # Convert normalized face back to uint8 format
+                                face_img = (face_img_normalized * 255).astype(np.uint8)
                                 
-                                if is_real:
-                                    # Extract just the face region for matching
-                                    face_img = cv2.resize(face_region, (224, 224))
-                                    
-                                    # Find matching person using DeepFace verification
-                                    person_id = self._find_matching_person(face_img)
-                                    if person_id is None:
-                                        person_id = self.next_person_id
-                                        self.person_embeddings[person_id] = []
-                                        self.next_person_id += 1
-                                    
-                                    # Store face image for future verification
-                                    self.person_embeddings[person_id].append(face_img)
-                                    if len(self.person_embeddings[person_id]) > MAX_EMBEDDING_HISTORY:
-                                        self.person_embeddings[person_id].pop(0)
-                                    
-                                    # Create cropped face with border for UI display
-                                    padding = 20
-                                    x_start = max(0, x - padding)
-                                    y_start = max(0, y - padding)
-                                    x_end = min(frame.shape[1], x + w + padding)
-                                    y_end = min(frame.shape[0], y + h + padding)
-                                    
-                                    face_with_border = frame[y_start:y_end, x_start:x_end].copy()
-                                    # Draw green bounding box on the cropped image
-                                    bbox_x = x - x_start
-                                    bbox_y = y - y_start
-                                    cv2.rectangle(face_with_border, (bbox_x, bbox_y), (bbox_x+w, bbox_y+h), (0, 255, 0), 2)
-                                    # Add person label
-                                    cv2.putText(face_with_border, f"Person {person_id}", 
-                                              (bbox_x, bbox_y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-                                    
-                                    # Store display image
-                                    self.person_display_images[person_id] = face_with_border
-                                    
-                                    # Add to detected faces with display image
-                                    detected_faces.append((person_id, face_with_border, False))
-                                    current_persons.add(person_id)
-                                else:
-                                    # This is a spoofed/static face - create display image with red box
-                                    padding = 20
-                                    x_start = max(0, x - padding)
-                                    y_start = max(0, y - padding)
-                                    x_end = min(frame.shape[1], x + w + padding)
-                                    y_end = min(frame.shape[0], y + h + padding)
-                                    
-                                    face_with_border = frame[y_start:y_end, x_start:x_end].copy()
-                                    # Draw red bounding box for spoofed faces
-                                    bbox_x = x - x_start
-                                    bbox_y = y - y_start
-                                    cv2.rectangle(face_with_border, (bbox_x, bbox_y), (bbox_x+w, bbox_y+h), (0, 0, 255), 2)
-                                    cv2.putText(face_with_border, "Spoofed", 
-                                              (bbox_x, bbox_y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-                                    
-                                    detected_faces.append((None, face_with_border, True))
-                                    static_image_alerts.append({
-                                        "timestamp": self._format_timestamp(timestamp),
-                                        "is_real": is_real
-                                    })
-                                    logger.info(f"Static/spoofed face detected at timestamp {self._format_timestamp(timestamp)}")
+                                # Resize to standard size for matching
+                                face_img = cv2.resize(face_img, (224, 224))
+                                
+                                # Find matching person using DeepFace verification
+                                person_id = self._find_matching_person(face_img)
+                                if person_id is None:
+                                    person_id = self.next_person_id
+                                    self.person_embeddings[person_id] = []
+                                    self.next_person_id += 1
+                                
+                                # Store face image for future verification
+                                self.person_embeddings[person_id].append(face_img)
+                                if len(self.person_embeddings[person_id]) > MAX_EMBEDDING_HISTORY:
+                                    self.person_embeddings[person_id].pop(0)
+                                
+                                # Create simple display image for UI (no bounding box since extract_faces doesn't provide coordinates)
+                                self.person_display_images[person_id] = face_img
+                                
+                                # Add to detected faces
+                                detected_faces.append((person_id, face_img, False))
+                                current_persons.add(person_id)
+                            else:
+                                # Spoofed face detected - just log it, no UI processing needed
+                                static_image_alerts.append({
+                                    "timestamp": self._format_timestamp(timestamp),
+                                    "is_real": is_real
+                                })
+                                logger.info(f"Static/spoofed face detected at timestamp {self._format_timestamp(timestamp)}")
                                 
                 except Exception as e:
                     logger.error(f"Face detection error: {e}")
