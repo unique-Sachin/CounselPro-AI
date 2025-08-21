@@ -7,26 +7,38 @@ MIN_OFF_PERIOD_DURATION = int(os.getenv("MIN_OFF_PERIOD_DURATION", "6"))  # Mini
 class VideoResponse:
     
     def _format_ui_friendly_results(self, camera_analysis, attire_analysis, video_metadata, audio_path):
-        """Format analysis results in a UI-friendly structure"""
+        """Format analysis results in a UI-friendly structure with comprehensive error handling"""
         
-        # Process participant data
-        participants = {}
-        person_timelines = camera_analysis['detailed_results']['person_timelines']
-        person_stats = camera_analysis['detailed_results']['person_stats']
-        
-        for person_id, stats in person_stats.items():
-            periods = self._group_consecutive_periods(person_timelines.get(person_id, []))
-            participants[f"person_{person_id}"] = self._format_participant_data(person_id, stats, periods)
+        try:
+            # Validate input data structure
+            if not self._validate_camera_analysis(camera_analysis):
+                raise ValueError("Invalid camera analysis data structure")
+            
+            if not self._validate_attire_analysis(attire_analysis):
+                raise ValueError("Invalid attire analysis data structure")
+            
+            # Process participant data
+            participants = {}
+            person_timelines = camera_analysis['detailed_results']['person_timelines']
+            person_stats = camera_analysis['detailed_results']['person_stats']
+            
+            for person_id, stats in person_stats.items():
+                periods = self._group_consecutive_periods(person_timelines.get(person_id, []))
+                participants[f"person_{person_id}"] = self._format_participant_data(person_id, stats, periods)
 
-        # Generate recommendations
-        recommendations = self._generate_recommendations(participants, attire_analysis)
-        
-        # Create session overview
-        session_overview = self._create_session_overview(camera_analysis, video_metadata, participants)
-        
-        # Create session patterns
-        overall_periods = self._group_consecutive_periods(camera_analysis['detailed_results']['camera_timeline'])
-        session_patterns = self._create_session_patterns(overall_periods, camera_analysis)
+            # Generate recommendations
+            recommendations = self._generate_recommendations(participants, attire_analysis)
+            
+            # Create session overview
+            session_overview = self._create_session_overview(camera_analysis, video_metadata, participants)
+            
+            # Create session patterns
+            overall_periods = self._group_consecutive_periods(camera_analysis['detailed_results']['camera_timeline'])
+            session_patterns = self._create_session_patterns(overall_periods, camera_analysis)
+            
+        except Exception as e:
+            # Clean up any partial processing and re-raise with clear error
+            raise ValueError(f"Failed to format video analysis results: {str(e)}") from e
 
         return {
             'session_overview': session_overview,
@@ -273,3 +285,53 @@ class VideoResponse:
     def _format_timestamp(self, timestamp: float) -> str:
         """Format timestamp as MM:SS"""
         return f"{int(timestamp//60):02d}:{int(timestamp%60):02d}"
+    
+    def _validate_camera_analysis(self, camera_analysis):
+        """Validate camera analysis data structure"""
+        try:
+            if not isinstance(camera_analysis, dict):
+                return False
+            
+            # Check required top-level keys
+            required_keys = ['success', 'detailed_results', 'summary']
+            if not all(key in camera_analysis for key in required_keys):
+                return False
+            
+            # Check if analysis was successful
+            if not camera_analysis.get('success', False):
+                return False
+            
+            # Validate detailed_results structure
+            detailed_results = camera_analysis['detailed_results']
+            required_detailed_keys = ['person_timelines', 'person_stats', 'camera_timeline', 'off_periods']
+            if not all(key in detailed_results for key in required_detailed_keys):
+                return False
+            
+            # Validate summary structure
+            summary = camera_analysis['summary']
+            required_summary_keys = ['camera_on_percentage', 'total_samples_analyzed']
+            if not all(key in summary for key in required_summary_keys):
+                return False
+            
+            # Validate off_periods have required fields
+            for period in detailed_results['off_periods']:
+                if not all(key in period for key in ['start_formatted', 'end_formatted', 'duration']):
+                    return False
+            
+            return True
+            
+        except Exception:
+            return False
+    
+    def _validate_attire_analysis(self, attire_analysis):
+        """Validate attire analysis data structure"""
+        try:
+            if attire_analysis is None:
+                return False
+            
+            # Check required attributes
+            required_attrs = ['attire_percentage', 'attire_analysis', 'background_percentage', 'background_analysis']
+            return all(hasattr(attire_analysis, attr) for attr in required_attrs)
+            
+        except Exception:
+            return False

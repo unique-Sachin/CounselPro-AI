@@ -1,41 +1,31 @@
-from sympy import use
 from app.models.video_analysis import AttireAndBackgroundAnalysis
 from app.service.video_processing.video_response import VideoResponse
 import cv2
 import numpy as np
 import os
 import base64
-import google.generativeai as genai
+from deepface import DeepFace
 from datetime import datetime
-from skimage.metrics import structural_similarity as ssim
-import logging
-from pathlib import Path
-from ultralytics import YOLO as UltralyticsYOLO
 from langchain.chat_models import init_chat_model
-from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict
 import logging
 from dotenv import load_dotenv
 
 load_dotenv()
 
-
 # Configure logging
 logger = logging.getLogger(__name__)
 
-FRAME_SAMPLING_INTERVAL = int(
-    os.getenv("FRAME_SAMPLING_INTERVAL", "2")
-)  # Extract frame every N seconds
-MIN_OFF_PERIOD_DURATION = int(
-    os.getenv("MIN_OFF_PERIOD_DURATION", "6")
-)  # Minimum seconds for significant off period
-YOLO_FACE_WEIGHTS = "backend/assets/models/yolov8n-face.pt"
+# Constants
+FRAME_SAMPLING_INTERVAL = int(os.getenv("FRAME_SAMPLING_INTERVAL", "2"))
+MIN_OFF_PERIOD_DURATION = int(os.getenv("MIN_OFF_PERIOD_DURATION", "6"))
+MAX_EMBEDDING_HISTORY = 5  # Number of face images to keep per person
 
 
 class VideoProcessor:
     """
     Optimized video processor for analyzing counseling session videos.
-    Uses frame-based processing instead of saving temporary video files.
+    Uses DeepFace for face detection, anti-spoofing, and person tracking.
     """
 
     def __init__(self):
@@ -45,44 +35,27 @@ class VideoProcessor:
         # Validate API key early
         self.llm = init_chat_model("gemini-2.0-flash", model_provider="google_genai")
 
-        # For storing latest detection results (IDs only)
-        self.latest_person_ids = {}
+        # Person tracking state
+        self.next_person_id = 1
+        self.person_embeddings = {}  # person_id -> List[face images] for DeepFace.verify()
+        self.person_display_images = {}  # person_id -> face image with bounding box for UI
 
-        # Initialize YOLO model (YOLO-only implementation)
-        self.yolo_model = None
-        yolo_weights = YOLO_FACE_WEIGHTS
-        yolo_device = os.getenv("YOLO_DEVICE", "cpu").strip()
-        if not yolo_weights:
-            logger.warning(
-                "YOLO_FACE_WEIGHTS not set; defaulting to backend/assets/models/yolov8n-face.pt"
-            )
-            # Resolve default relative to project root
-            project_root = Path(__file__).resolve().parents[4]
-            default_path = (
-                project_root / "backend" / "assets" / "models" / "yolov8n-face.pt"
-            )
-            yolo_weights = str(default_path)
-        else:
-            # Resolve relative paths to absolute
-            p = Path(yolo_weights)
-            if not p.is_absolute():
-                project_root = Path(__file__).resolve().parents[4]
-                yolo_weights = str((project_root / p).resolve())
-        if not Path(yolo_weights).exists():
-            raise FileNotFoundError(f"YOLO weights not found at: {yolo_weights}")
+        # Pre-load DeepFace models
         try:
-            self.yolo_model = UltralyticsYOLO(yolo_weights)
-            # Move model to desired device if supported
-            try:
-                if hasattr(self.yolo_model, "to"):
-                    self.yolo_model.to(yolo_device)
-            except Exception:
-                pass
-            logger.info(f"YOLO model loaded: {yolo_weights} on device: {yolo_device}")
-        except Exception as e:
-            logger.error(
-                f"Failed to load YOLO model with weights '{yolo_weights}': {e}"
+            logger.info("Initializing DeepFace models...")
+            # Warm up face detection and recognition using official API
+            dummy_img = np.zeros((224, 224, 3), dtype=np.uint8)
+            _ = DeepFace.extract_faces(
+                img_path=dummy_img,
+                enforce_detection=False
             )
+            _ = DeepFace.represent(
+                img_path=dummy_img,
+                enforce_detection=False
+            )
+            logger.info("DeepFace models initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize DeepFace: {e}")
             raise
 
         logger.info("VideoProcessor initialized successfully")
@@ -90,16 +63,43 @@ class VideoProcessor:
     def cleanup_resources(self):
         """Clean up video processing resources"""
         try:
-            if hasattr(self, "face_detection") and self.face_detection:
-                self.face_detection.close()
-                logger.debug("Face detection resources cleaned up")
-
+            # Clear person tracking data
+            self.person_embeddings.clear()
+            logger.debug("Video processing resources cleaned up")
         except Exception as e:
-            logger.warning(f"Error during video processing resource cleanup: {e}")
+            logger.warning(f"Error during cleanup: {e}")
 
     def __del__(self):
         """Cleanup when object is destroyed"""
         self.cleanup_resources()
+
+    def _find_matching_person(self, face_img: np.ndarray) -> Optional[int]:
+        """Find if this face matches any known person using DeepFace verification"""
+        if face_img is None:
+            return None
+            
+        best_match = None
+        lowest_distance = float('inf')
+            
+        for person_id, stored_face_imgs in self.person_embeddings.items():
+            for stored_face in stored_face_imgs:
+                try:
+                    # Use DeepFace.verify for proper face matching
+                    result = DeepFace.verify(
+                        img1_path=face_img,
+                        img2_path=stored_face,
+                        enforce_detection=False
+                    )
+                    
+                    if result["verified"] and result["distance"] < lowest_distance:
+                        lowest_distance = result["distance"]
+                        best_match = person_id
+                        
+                except Exception as e:
+                    logger.debug(f"Face verification error: {e}")
+                    continue
+                    
+        return best_match
 
     def _format_timestamp(self, timestamp: float) -> str:
         """Format timestamp as MM:SS"""
@@ -237,7 +237,10 @@ class VideoProcessor:
         self, frames_data: dict, duration: float, fps: float
     ):
         """
-        Analyzes camera status from pre-extracted frames.
+        Analyzes camera status from pre-extracted frames using DeepFace.
+        
+        Detects faces, performs anti-spoofing, and tracks individual people
+        across frames using face recognition.
 
         Args:
             frames_data (dict): Dictionary mapping timestamp to frame data
@@ -252,22 +255,13 @@ class VideoProcessor:
             # Analysis tracking variables
             camera_timeline = []
             person_timelines = {}  # Dictionary to track each person's camera status
-
+            static_image_alerts = []  # Track static image/spoofing detections
             face_detected_count = 0
             total_samples = 0
 
             # Camera OFF period tracking
             current_off_start = None
             consecutive_off_count = 0
-
-            # Person tracking variables
-            last_face_positions = {}  # Store last known positions of each person
-            person_ids = {}  # Map face positions to consistent person IDs
-            next_person_id = 1  # Counter for assigning new person IDs
-
-            # Static image detection variables
-            person_frame_history = {}  # Store recent frames for each person
-            static_image_status = {}  # Track which persons have static images
 
             logger.info(f"Analyzing {len(frames_data)} extracted frames")
 
@@ -276,327 +270,225 @@ class VideoProcessor:
                 frame = frames_data[timestamp]
                 total_samples += 1
 
-                faces = []
+                detected_faces = []  # List of (person_id, bbox, is_spoofed)
+                current_persons = set()  # Track active persons in this frame
 
-                # YOLO-only face detection
                 try:
-                    yolo_results = self.yolo_model(frame, verbose=False)
-                    if yolo_results and len(yolo_results) > 0:
-                        result0 = yolo_results[0]
-                        if hasattr(result0, "boxes") and result0.boxes is not None:
-                            for b in result0.boxes:
+                    # Use DeepFace for face detection with facial area information
+                    analysis_results = DeepFace.analyze(
+                        img_path=frame,
+                        actions=['emotion'],  # Minimal analysis to get face regions
+                        enforce_detection=False,
+                        silent=True
+                    )
+                    
+                    # Handle both single face and multiple faces
+                    if not isinstance(analysis_results, list):
+                        analysis_results = [analysis_results]
+
+                    if analysis_results:
+                        for result in analysis_results:
+                            # Get facial area coordinates - DeepFace provides 'region' key
+                            region = result.get("region", {})
+                            x = region.get("x", 0)
+                            y = region.get("y", 0)
+                            w = region.get("w", 0)
+                            h = region.get("h", 0)
+                            
+                            if w > 0 and h > 0:  # Valid face detection
+                                # Extract face region from original frame
+                                face_region = frame[y:y+h, x:x+w]
+                                
+                                # Anti-spoofing check using DeepFace's extract_faces with anti_spoofing
                                 try:
-                                    xyxy = (
-                                        b.xyxy[0].tolist()
-                                        if hasattr(b.xyxy[0], "tolist")
-                                        else list(b.xyxy[0])
+                                    face_objs = DeepFace.extract_faces(
+                                        img_path=face_region,
+                                        enforce_detection=False,
+                                        anti_spoofing=True
                                     )
-                                    x1, y1, x2, y2 = map(int, xyxy[:4])
-                                    w = max(0, x2 - x1)
-                                    h = max(0, y2 - y1)
-                                    if w > 0 and h > 0:
-                                        faces.append((x1, y1, w, h))
-                                except Exception:
-                                    continue
-                except Exception as det_err:
-                    logger.error(f"YOLO detection failed: {det_err}")
-
-                camera_on = len(faces) > 0
-                if camera_on:
-                    face_detected_count += 1
-
-                # Log progress every 10 frames or when faces are detected
-                if total_samples % 10 == 0 or len(faces) > 0:
+                                    is_real = face_objs[0].get("is_real", True) if face_objs else True
+                                except:
+                                    is_real = True  # Default to real if anti-spoofing fails
+                                
+                                if is_real:
+                                    # Extract just the face region for matching
+                                    face_img = cv2.resize(face_region, (224, 224))
+                                    
+                                    # Find matching person using DeepFace verification
+                                    person_id = self._find_matching_person(face_img)
+                                    if person_id is None:
+                                        person_id = self.next_person_id
+                                        self.person_embeddings[person_id] = []
+                                        self.next_person_id += 1
+                                    
+                                    # Store face image for future verification
+                                    self.person_embeddings[person_id].append(face_img)
+                                    if len(self.person_embeddings[person_id]) > MAX_EMBEDDING_HISTORY:
+                                        self.person_embeddings[person_id].pop(0)
+                                    
+                                    # Create cropped face with border for UI display
+                                    padding = 20
+                                    x_start = max(0, x - padding)
+                                    y_start = max(0, y - padding)
+                                    x_end = min(frame.shape[1], x + w + padding)
+                                    y_end = min(frame.shape[0], y + h + padding)
+                                    
+                                    face_with_border = frame[y_start:y_end, x_start:x_end].copy()
+                                    # Draw green bounding box on the cropped image
+                                    bbox_x = x - x_start
+                                    bbox_y = y - y_start
+                                    cv2.rectangle(face_with_border, (bbox_x, bbox_y), (bbox_x+w, bbox_y+h), (0, 255, 0), 2)
+                                    # Add person label
+                                    cv2.putText(face_with_border, f"Person {person_id}", 
+                                              (bbox_x, bbox_y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
+                                    
+                                    # Store display image
+                                    self.person_display_images[person_id] = face_with_border
+                                    
+                                    # Add to detected faces with display image
+                                    detected_faces.append((person_id, face_with_border, False))
+                                    current_persons.add(person_id)
+                                else:
+                                    # This is a spoofed/static face - create display image with red box
+                                    padding = 20
+                                    x_start = max(0, x - padding)
+                                    y_start = max(0, y - padding)
+                                    x_end = min(frame.shape[1], x + w + padding)
+                                    y_end = min(frame.shape[0], y + h + padding)
+                                    
+                                    face_with_border = frame[y_start:y_end, x_start:x_end].copy()
+                                    # Draw red bounding box for spoofed faces
+                                    bbox_x = x - x_start
+                                    bbox_y = y - y_start
+                                    cv2.rectangle(face_with_border, (bbox_x, bbox_y), (bbox_x+w, bbox_y+h), (0, 0, 255), 2)
+                                    cv2.putText(face_with_border, "Spoofed", 
+                                              (bbox_x, bbox_y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
+                                    
+                                    detected_faces.append((None, face_with_border, True))
+                                    static_image_alerts.append({
+                                        "timestamp": self._format_timestamp(timestamp),
+                                        "is_real": is_real
+                                    })
+                                    logger.info(f"Static/spoofed face detected at timestamp {self._format_timestamp(timestamp)}")
+                                
+                except Exception as e:
+                    logger.error(f"Face detection error: {e}")
+                    
+                # Log progress every 10 frames
+                if total_samples % 10 == 0:
                     logger.debug(
-                        f"Frame {total_samples}: {len(faces)} faces detected at {timestamp:.1f}s ({'ON' if camera_on else 'OFF'})"
+                        f"Frame {total_samples}: {len(detected_faces)} faces detected at {timestamp:.1f}s"
                     )
 
-                # Assign person IDs to detected faces
-                current_person_ids = self._assign_person_ids(
-                    faces, last_face_positions, person_ids, next_person_id
-                )
-
-                # Store the current person IDs for reference
-                self.latest_person_ids = current_person_ids
-
-                # YOLO-only mode: no facial landmarks captured
-
-                # Update next_person_id if new people were detected
-                if current_person_ids:
-                    next_person_id = (
-                        max([pid for _, pid in current_person_ids.items()]) + 1
-                    )
-
-                # Update person timelines
-                current_timestamp_persons = {}
-                for face_idx, (x, y, w, h) in enumerate(faces):
-                    face_key = f"{face_idx}"
-                    if face_key in current_person_ids:
-                        person_id = current_person_ids[face_key]
-
-                        # Extract face region for static image detection
-                        face_region = frame[y : y + h, x : x + w].copy()
-
-                        # Initialize frame history for this person if needed
-                        if person_id not in person_frame_history:
-                            person_frame_history[person_id] = []
-
-                        # Add current face region to history (keep last 5 frames)
-                        person_frame_history[person_id].append(face_region)
-                        if len(person_frame_history[person_id]) > 5:
-                            person_frame_history[person_id].pop(0)
-
-                        # Check if this is a static image
-                        is_static = False
-                        if len(person_frame_history[person_id]) >= 3:
-                            is_static = self._is_static_image(
-                                face_region, person_id, person_frame_history
-                            )
-
-                        # Update static image status
-                        static_image_status[person_id] = is_static
-
-                        # Add to person's timeline
+                # Update person timelines for valid faces
+                for person_id, face_data, is_spoofed in detected_faces:
+                    if person_id is not None:  # Only track real faces
+                        # Add to person's timeline if not already tracking
                         if person_id not in person_timelines:
                             person_timelines[person_id] = []
-
-                        person_timelines[person_id].append(
-                            {
-                                "timestamp": timestamp,
-                                "camera_on": True,
-                                "camera_static": is_static,
-                                "face_position": [int(x), int(y), int(w), int(h)],
-                            }
-                        )
-
-                        current_timestamp_persons[person_id] = True
-
-                # Mark absent people as camera off
-                for pid in person_timelines.keys():
-                    if pid not in current_timestamp_persons:
-                        person_timelines[pid].append(
-                            {
-                                "timestamp": timestamp,
-                                "camera_on": False,
-                                "camera_static": False,
-                                "face_position": None,
-                            }
-                        )
-
-                # Check if any detected faces are static images
-                has_static_images = any(
-                    static_image_status.get(pid, False)
-                    for pid in current_person_ids.values()
-                )
-                static_count = sum(
-                    1
-                    for pid in current_person_ids.values()
-                    if static_image_status.get(pid, False)
-                )
-
-                # Add to overall timeline
-                camera_timeline.append(
-                    {
-                        "timestamp": timestamp,
-                        "camera_on": camera_on,
-                        "has_static_images": has_static_images,
-                        "static_count": static_count,
-                        "face_count": len(faces),
-                        "face_positions": list(faces) if len(faces) > 0 else [],
-                        "person_ids": current_person_ids,
-                    }
-                )
-
-                # Update OFF period tracking
-                if not camera_on:
-                    if current_off_start is None:
-                        current_off_start = timestamp
-                        consecutive_off_count = 1
-                    else:
-                        consecutive_off_count += 1
+                        
+                        # Add timeline entry (simplified since we don't have exact bbox coordinates)
+                        person_timelines[person_id].append({
+                            "timestamp": timestamp,
+                            "camera_on": True,
+                            "face_detected": True
+                        })
+                            
+                # Check if this frame indicates camera off period
+                frame_camera_on = len([f for f in detected_faces if not f[2]]) > 0  # Count non-spoofed faces
+                
+                # Add timeline event for every frame
+                camera_timeline.append({
+                    "timestamp": timestamp,
+                    "camera_on": frame_camera_on,
+                    "face_detected": frame_camera_on
+                })
+                
+                if frame_camera_on:
+                    face_detected_count += 1
+                    consecutive_off_count = 0
                 else:
-                    if current_off_start is not None:
-                        current_off_start = None
-                        consecutive_off_count = 0
+                    consecutive_off_count += 1
+                        
+            # Calculate statistics
+            total_off_duration = 0  # Will be calculated from camera timeline later
+            camera_availability = round((face_detected_count / total_samples) * 100, 1) if total_samples > 0 else 0
 
-            # Calculate final statistics
-            face_detection_ratio = (
-                face_detected_count / total_samples if total_samples > 0 else 0
-            )
-            camera_on_overall = face_detection_ratio > 0.1
-
-            # Detect significant camera OFF periods (overall and per-person)
-            off_periods, person_off_periods = self._detect_off_periods(
-                camera_timeline, person_timelines
-            )
-
-            logger.info(
-                f"Camera analysis complete: {face_detected_count}/{total_samples} samples with faces detected"
-            )
-
-            # Process per-person statistics
+            # Generate person statistics with face images
             person_stats = {}
             for person_id, timeline in person_timelines.items():
-                on_count = sum(1 for event in timeline if event["camera_on"])
-                static_count = sum(
-                    1 for event in timeline if event.get("camera_static", False)
-                )
-                active_count = on_count - static_count
-                total_count = len(timeline)
-
+                on_count = sum(1 for event in timeline if event.get("camera_on", False))
+                total_count = len(timeline) if timeline else 1  # Avoid division by zero
+                
                 on_percentage = (on_count / total_count * 100) if total_count > 0 else 0
-                static_percentage = (
-                    (static_count / total_count * 100) if total_count > 0 else 0
-                )
-                active_percentage = (
-                    (active_count / total_count * 100) if total_count > 0 else 0
-                )
-
+                
+                # Get the latest face image with bounding box for this person
+                face_image_b64 = None
+                if person_id in self.person_display_images:
+                    display_image = self.person_display_images[person_id]
+                    face_image_b64 = self._image_to_base64(display_image)
+                
                 person_stats[person_id] = {
                     "camera_on_percentage": round(on_percentage, 2),
-                    "camera_static_percentage": round(static_percentage, 2),
-                    "camera_active_percentage": round(active_percentage, 2),
+                    "camera_static_percentage": 0.0,  # No longer tracking static images separately
+                    "camera_active_percentage": round(on_percentage, 2),  # Same as on_percentage
                     "samples_with_faces": on_count,
-                    "samples_with_static_images": static_count,
-                    "samples_with_active_camera": active_count,
+                    "samples_with_static_images": 0,  # DeepFace handles anti-spoofing
+                    "samples_with_active_camera": on_count,
                     "total_samples": total_count,
-                    "camera_on_overall": on_percentage
-                    > 10,  # Same threshold as overall
-                    "using_static_image": static_count > 0
-                    and static_count / on_count > 0.8,  # Mostly static
+                    "camera_on_overall": on_percentage > 10,  # Same threshold as overall
+                    "using_static_image": False,  # DeepFace anti-spoofing handles this
+                    "face_image": face_image_b64,  # Base64 encoded face image with bounding box
+                    "person_name": f"Person {person_id}"  # Default name, can be updated later
                 }
+
+            # Create summary statistics for the expected format
+            camera_on_percentage = round(face_detected_count / total_samples * 100, 1) if total_samples > 0 else 0
+            using_static_image = len(static_image_alerts) > 0
+            
+            summary = {
+                "camera_on_percentage": camera_on_percentage,
+                "camera_static_percentage": round(len(static_image_alerts) / total_samples * 100, 1) if total_samples > 0 else 0,
+                "camera_active_percentage": camera_on_percentage,  # Same as camera_on since we filter out static
+                "samples_with_faces": face_detected_count,
+                "samples_with_static_images": len(static_image_alerts),
+                "samples_with_active_camera": face_detected_count,
+                "total_samples": total_samples,
+                "total_samples_analyzed": total_samples,  # Add this field that video_response.py expects
+                "camera_on_overall": camera_on_percentage > 10,
+                "using_static_image": using_static_image
+            }
+
+            # Calculate off periods from camera timeline
+            off_periods = self._detect_off_periods(camera_timeline)
+
+            # Format results
+            detailed_results = {
+                "camera_timeline": camera_timeline,
+                "person_timelines": person_timelines,
+                "person_stats": person_stats,
+                "static_image_alerts": static_image_alerts,
+                "off_periods": off_periods,  # Add the missing off_periods field
+                "total_off_duration": round(total_off_duration, 1),
+                "camera_availability": camera_availability,
+                "face_detection_rate": round(face_detected_count / total_samples * 100, 1)
+            }
 
             return {
                 "success": True,
-                "video_info": {
-                    "duration_seconds": duration,
-                    "fps": fps,
-                    "analysis_timestamp": datetime.now().isoformat(),
-                },
-                "summary": {
-                    "camera_on_overall": camera_on_overall,
-                    "camera_on_percentage": round(face_detection_ratio * 100, 2),
-                    "total_samples_analyzed": total_samples,
-                    "samples_with_faces": face_detected_count,
-                    "person_count": len(person_timelines),
-                    "sampling_interval_seconds": 2.0,
-                    "significant_off_periods": len(off_periods),
-                    "total_off_duration": sum(p["duration"] for p in off_periods),
-                    "static_image_detection": {
-                        "enabled": True,
-                        "persons_with_static_images": sum(
-                            1
-                            for _pid, stats in person_stats.items()
-                            if stats.get("using_static_image", False)
-                        ),
-                        "detection_method": "SSIM",
-                        "ssim_threshold": 0.95,
-                    },
-                },
-                "detailed_results": {
-                    "camera_timeline": camera_timeline,
-                    "person_timelines": person_timelines,
-                    "person_stats": person_stats,
-                    "off_periods": off_periods,
-                    "person_off_periods": person_off_periods,
-                },
-                "analysis_metadata": {
-                    "detection_method": "YOLO Face Detection + SSIM (static detection)",
-                    "sampling_strategy": f"Every {FRAME_SAMPLING_INTERVAL} seconds",
-                    "minimum_off_period_for_documentation": MIN_OFF_PERIOD_DURATION,
-                    "static_image_detection": "SSIM only (no facial landmarks)",
-                },
+                "detailed_results": detailed_results,
+                "summary": summary,  # Add the missing summary section
+                "error": None
             }
 
         except Exception as e:
-            logger.error(f"Error analyzing camera status: {e}", exc_info=True)
-            return {"error": f"Error analyzing camera status: {e}", "success": False}
-
-    def _calculate_frame_similarity(self, frame1, frame2):
-        """Calculate similarity between two frames using SSIM"""
-        # Convert frames to grayscale for comparison
-        gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
-
-        # Ensure both images have same dimensions
-        if gray1.shape != gray2.shape:
-            gray2 = cv2.resize(gray2, (gray1.shape[1], gray1.shape[0]))
-
-        # Calculate SSIM between the two frames
-        score, _ = ssim(gray1, gray2, full=True)
-        return score
-
-    def _is_static_image(
-        self, current_frame, person_id, person_frame_history, similarity_threshold=0.95
-    ):
-        """Determine if a person's image is static (like a profile picture)"""
-        if (
-            person_id not in person_frame_history
-            or len(person_frame_history[person_id]) < 3
-        ):
-            return False
-
-        # Get the last few frames for this person
-        recent_frames = person_frame_history[person_id][-3:]
-
-        # First check: Calculate similarity between current frame and recent frames using SSIM
-        similarities = [
-            self._calculate_frame_similarity(current_frame, frame)
-            for frame in recent_frames
-        ]
-        frame_similarity_static = all(
-            sim > similarity_threshold for sim in similarities
-        )
-
-        # YOLO-only mode: fallback to SSIM-only decision
-        return frame_similarity_static
-
-    def _assign_person_ids(
-        self, faces, last_face_positions, person_ids, next_person_id
-    ):
-        """Assign consistent IDs to people across frames based on face positions"""
-        current_person_ids = {}
-
-        # No faces detected in this frame
-        if len(faces) == 0:
-            return current_person_ids
-
-        # Process each detected face
-        for i, (x, y, w, h) in enumerate(faces):
-            face_key = f"{i}"
-            face_center = (x + w // 2, y + h // 2)
-            matched_person = None
-            min_distance = float("inf")
-
-            # Try to match with existing people based on position
-            for person_id, last_pos in last_face_positions.items():
-                last_x, last_y, last_w, last_h = last_pos
-                last_center = (last_x + last_w // 2, last_y + last_h // 2)
-
-                # Calculate distance between face centers
-                distance = np.sqrt(
-                    (face_center[0] - last_center[0]) ** 2
-                    + (face_center[1] - last_center[1]) ** 2
-                )
-
-                # Consider it a match if distance is less than average face size
-                avg_size = (w + h + last_w + last_h) / 4
-                if distance < avg_size * 0.8 and distance < min_distance:
-                    min_distance = distance
-                    matched_person = person_id
-
-            # Assign ID (either matched or new)
-            if matched_person is not None:
-                current_person_ids[face_key] = matched_person
-            else:
-                # Assign new ID
-                current_person_ids[face_key] = next_person_id
-                next_person_id += 1
-
-            # Update last known position
-            last_face_positions[current_person_ids[face_key]] = (x, y, w, h)
-
-        return current_person_ids
+            logger.error(f"Camera status analysis failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "detailed_results": None,
+                "summary": None,
+                "error": str(e)
+            }
 
     def _detect_off_periods(self, camera_timeline, person_timelines=None):
         """Detect significant camera OFF periods from timeline"""
@@ -605,93 +497,42 @@ class VideoProcessor:
         current_off_start = None
 
         for event in camera_timeline:
-            if not event["camera_on"] and current_off_start is None:
-                current_off_start = event["timestamp"]
-            elif event["camera_on"] and current_off_start is not None:
-                duration = event["timestamp"] - current_off_start
+            timestamp = event.get("timestamp", 0)
+            camera_on = event.get("camera_on", False)
+
+            if not camera_on and current_off_start is None:
+                current_off_start = timestamp
+            elif camera_on and current_off_start is not None:
+                duration = timestamp - current_off_start
 
                 # Only include significant OFF periods
                 if duration >= MIN_OFF_PERIOD_DURATION:
-                    off_periods.append(
-                        {
-                            "start_time": current_off_start,
-                            "end_time": event["timestamp"],
-                            "duration": duration,
-                            "start_formatted": self._format_timestamp(
-                                current_off_start
-                            ),
-                            "end_formatted": self._format_timestamp(event["timestamp"]),
-                        }
-                    )
+                    off_periods.append({
+                        "start": self._format_timestamp(current_off_start),
+                        "end": self._format_timestamp(timestamp),
+                        "start_formatted": self._format_timestamp(current_off_start),
+                        "end_formatted": self._format_timestamp(timestamp),
+                        "duration": round(duration, 1)
+                    })
 
                 current_off_start = None
 
         # Handle case where video ends during OFF period
         if current_off_start is not None and camera_timeline:
-            last_timestamp = camera_timeline[-1]["timestamp"]
+            last_event = camera_timeline[-1]
+            last_timestamp = last_event.get("timestamp", 0)
             duration = last_timestamp - current_off_start
 
             if duration >= MIN_OFF_PERIOD_DURATION:
-                off_periods.append(
-                    {
-                        "start_time": current_off_start,
-                        "end_time": last_timestamp,
-                        "duration": duration,
-                        "start_formatted": self._format_timestamp(current_off_start),
-                        "end_formatted": self._format_timestamp(last_timestamp),
-                    }
-                )
+                off_periods.append({
+                    "start": self._format_timestamp(current_off_start),
+                    "end": self._format_timestamp(last_timestamp),
+                    "start_formatted": self._format_timestamp(current_off_start),
+                    "end_formatted": self._format_timestamp(last_timestamp),
+                    "duration": round(duration, 1)
+                })
 
-        # Per-person off periods if person_timelines is provided
-        person_off_periods = {}
-        if person_timelines:
-            for person_id, timeline in person_timelines.items():
-                person_off_periods[person_id] = []
-                current_off_start = None
-
-                for event in timeline:
-                    if not event["camera_on"] and current_off_start is None:
-                        current_off_start = event["timestamp"]
-                    elif event["camera_on"] and current_off_start is not None:
-                        duration = event["timestamp"] - current_off_start
-
-                        # Only include significant OFF periods
-                        if duration >= MIN_OFF_PERIOD_DURATION:
-                            person_off_periods[person_id].append(
-                                {
-                                    "start_time": current_off_start,
-                                    "end_time": event["timestamp"],
-                                    "duration": duration,
-                                    "start_formatted": self._format_timestamp(
-                                        current_off_start
-                                    ),
-                                    "end_formatted": self._format_timestamp(
-                                        event["timestamp"]
-                                    ),
-                                }
-                            )
-
-                        current_off_start = None
-
-                # Handle case where video ends during OFF period
-                if current_off_start is not None and timeline:
-                    last_timestamp = timeline[-1]["timestamp"]
-                    duration = last_timestamp - current_off_start
-
-                    if duration >= MIN_OFF_PERIOD_DURATION:
-                        person_off_periods[person_id].append(
-                            {
-                                "start_time": current_off_start,
-                                "end_time": last_timestamp,
-                                "duration": duration,
-                                "start_formatted": self._format_timestamp(
-                                    current_off_start
-                                ),
-                                "end_formatted": self._format_timestamp(last_timestamp),
-                            }
-                        )
-
-        return off_periods, person_off_periods if person_timelines else off_periods
+        return off_periods
 
     def _encode_frame_to_base64(self, frame):
         """Encode a frame to base64 for Gemini API"""
@@ -710,6 +551,27 @@ class VideoProcessor:
             logger.error(f"Error encoding frame to base64: {e}")
             return None
 
+    def _image_to_base64(self, image):
+        """Convert an image (face image with bounding box) to base64 for UI display"""
+        try:
+            # Handle both BGR and RGB images
+            if len(image.shape) == 3:
+                # If it's BGR (OpenCV default), convert to RGB for web display
+                image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            else:
+                image_rgb = image
+            
+            # Encode to JPEG
+            _, buffer = cv2.imencode(".jpg", image_rgb, [cv2.IMWRITE_JPEG_QUALITY, 90])
+            
+            # Convert to base64
+            base64_image = base64.b64encode(buffer).decode("utf-8")
+            return base64_image
+            
+        except Exception as e:
+            logger.error(f"Error converting image to base64: {e}")
+            return None
+
     def _perform_visual_analysis_from_frames(self, frames_data, camera_timeline):
         """
         Perform attire and background analysis on selected frames using pre-extracted frame data
@@ -725,44 +587,36 @@ class VideoProcessor:
         try:
             logger.info("Starting visual intelligence analysis from extracted frames")
 
-            # Select best frames for analysis (inlined from _select_best_frames_for_analysis)
-            try:
-                frames_with_faces = [
-                    event for event in camera_timeline if event["face_count"] > 0
-                ]
-                frames_with_faces.sort(
-                    key=lambda x: (x["face_count"], x["timestamp"]), reverse=True
-                )
-                selected_frames = frames_with_faces[:3]
-                logger.info(
-                    f"Selected {len(selected_frames)} frames for visual analysis"
-                )
-                for i, frame in enumerate(selected_frames):
-                    logger.debug(
-                        f"   Frame {i+1}: {frame['face_count']} faces at {frame['timestamp']:.1f}s"
-                    )
-            except Exception as e:
-                logger.error(f"Error selecting frames for analysis: {e}")
-                selected_frames = []
-
-            if not selected_frames:
+            # Select best frames for analysis - use simple timestamp-based selection
+            if not camera_timeline:
                 return AttireAndBackgroundAnalysis(
                     success=False,
-                    attire_analysis="No suitable frames found for visual analysis",
-                    background_analysis="No suitable frames found for visual analysis",
+                    attire_analysis="No frames available for analysis",
+                    background_analysis="No frames available for analysis",
                     attire_percentage=0.0,
                     background_percentage=0.0,
-                    error="No suitable frames found for visual analysis",
+                    error="No frames available for analysis",
                 )
+
+            # Select up to 3 frames evenly distributed across the timeline
+            timestamps = list(frames_data.keys())
+            if len(timestamps) <= 3:
+                selected_timestamps = timestamps
+            else:
+                # Select beginning, middle, and end frames
+                selected_timestamps = [
+                    timestamps[0],
+                    timestamps[len(timestamps) // 2],
+                    timestamps[-1]
+                ]
+
+            logger.info(f"Selected {len(selected_timestamps)} frames for visual analysis")
 
             # Prepare frames for batch analysis
             valid_frames = []
             valid_timestamps = []
 
-            for i, frame_data in enumerate(selected_frames):
-                timestamp = frame_data["timestamp"]
-                logger.debug(f"Preparing frame {i+1} at {timestamp:.1f}s")
-
+            for timestamp in selected_timestamps:
                 # Get frame from pre-extracted data
                 frame = frames_data.get(timestamp)
                 if frame is None:
@@ -782,7 +636,7 @@ class VideoProcessor:
                     error="No valid frames available for analysis",
                 )
 
-            # Perform batch analysis for all frames at once (inlined)
+            # Perform batch analysis for all frames at once
             logger.info(f"Analyzing {len(valid_frames)} frames in a single batch")
 
             # Encode frames
@@ -817,44 +671,55 @@ class VideoProcessor:
             messages = [{"role": "user", "content": user_content}]
 
             # Define structured output using Pydantic
-            structured_llm = self.llm.with_structured_output(
-                AttireAndBackgroundAnalysis
-            )
+            structured_llm = self.llm.with_structured_output(AttireAndBackgroundAnalysis)
 
             # Invoke with chat-style messages
             try:
                 response = structured_llm.invoke(messages)
+                
+                # Validate and return response
+                if isinstance(response, AttireAndBackgroundAnalysis):
+                    if response.success:
+                        logger.info("Visual analysis completed successfully")
+                    else:
+                        logger.warning(f"Visual analysis returned unsuccessful: {response.error}")
+                    return response
+                else:
+                    error_msg = "Invalid response type from visual analysis"
+                    logger.error(error_msg)
+                    return AttireAndBackgroundAnalysis(
+                        success=False,
+                        attire_analysis="Analysis failed: invalid response type",
+                        background_analysis="Analysis failed: invalid response type",
+                        attire_percentage=0.0,
+                        background_percentage=0.0,
+                        error=error_msg
+                    )
+                    
             except Exception as e:
-                logger.error(f"Error in batch analysis: {str(e)}", exc_info=True)
+                error_msg = f"Error in visual analysis: {str(e)}"
+                logger.error(error_msg, exc_info=True)
                 return AttireAndBackgroundAnalysis(
                     success=False,
-                    attire_analysis="LLM invocation failed",
-                    background_analysis="LLM invocation failed",
+                    attire_analysis="Analysis failed",
+                    background_analysis="Analysis failed",
                     attire_percentage=0.0,
                     background_percentage=0.0,
-                    error=str(e),
+                    error=error_msg
                 )
-
-            # Ensure response is the correct type
-            if isinstance(response, AttireAndBackgroundAnalysis):
-                response.success = True
-                return response
-
-            # Attempt coercion if dict-like
-            try:
-                return AttireAndBackgroundAnalysis(
-                    **(response if isinstance(response, dict) else {})
-                )
-            except Exception as e:
-                logger.error(f"Invalid response structure from LLM: {e}")
-                return AttireAndBackgroundAnalysis(
-                    success=False,
-                    attire_analysis="Invalid response structure",
-                    background_analysis="Invalid response structure",
-                    attire_percentage=0.0,
-                    background_percentage=0.0,
-                    error="Invalid response structure",
-                )
+                    
+        except Exception as e:
+            error_msg = f"Error in visual analysis: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            return AttireAndBackgroundAnalysis(
+                success=False,
+                attire_analysis="Analysis failed",
+                background_analysis="Analysis failed",
+                attire_percentage=0.0,
+                background_percentage=0.0,
+                error=error_msg
+            )
+            
 
         except Exception as e:
             logger.error(f"Error in batch analysis: {str(e)}", exc_info=True)

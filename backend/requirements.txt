@@ -62,3 +62,5 @@ aiosmtplib
 
 cloudinary
 ultralytics
+
+deepface
