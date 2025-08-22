@@ -40,7 +40,8 @@ export default function SessionDetailsPage() {
     queryKey: ["session", sessionUid],
     queryFn: () => getSession(sessionUid),
     enabled: !!sessionUid,
-    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,
+    // refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,
+    refetchInterval: 3000,
   });
 
   const isAudioUrl = (url: string) => {

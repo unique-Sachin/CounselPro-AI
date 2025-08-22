@@ -19,7 +19,7 @@ export default function AnalysisTab() {
     error,
     isError,
   } = useSessionAnalysisWithPolling(sessionUid, {
-    pollingInterval: 5000, // Poll every 5 seconds when status is PENDING/STARTED
+    pollingInterval: 2000, // Poll every 5 seconds when status is PENDING/STARTED
   });
 
   // Loading state
