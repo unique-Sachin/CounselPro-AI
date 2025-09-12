@@ -20,6 +20,7 @@ import ParticipantsGrid from "./participants-grid";
 import EnvironmentCard from "./environment-card";
 import SessionTimeline from "./session-timeline";
 import TechnicalInfo from "./technical-info";
+import SessionMetadataCard from "./session-metadata";
 
 interface AnalysisDashboardProps {
   analysisData: SessionAnalysisResponse;
@@ -125,27 +126,37 @@ export default function AnalysisDashboard({ analysisData, uid }: AnalysisDashboa
       {/* Analysis Cards Grid */}
       <motion.div 
         variants={containerVariants}
-        className="grid gap-6 md:grid-cols-2"
+        className="grid gap-6 lg:grid-cols-2"
       >
         {/* Course Accuracy Card */}
-        <motion.div variants={cardVariants}>
+        <motion.div variants={cardVariants} className="min-w-0">
           <CourseAccuracyCard audioAnalysisData={audioAnalysis} />
         </motion.div>
 
         {/* Payment Verification Card */}
-        <motion.div variants={cardVariants}>
+        <motion.div variants={cardVariants} className="min-w-0">
           <PaymentVerificationCard audioAnalysisData={audioAnalysis} />
         </motion.div>
 
         {/* Pressure Analysis Card */}
-        <motion.div variants={cardVariants}>
+        <motion.div variants={cardVariants} className="min-w-0">
           <PressureAnalysisCard audioAnalysisData={audioAnalysis} />
         </motion.div>
 
         {/* One-on-One Verification Card */}
-        <motion.div variants={cardVariants}>
+        <motion.div variants={cardVariants} className="min-w-0">
           <OneOnOneCard videoAnalysisData={videoAnalysis} />
         </motion.div>
+      </motion.div>
+
+      {/* Session Metadata */}
+      <motion.div
+        variants={cardVariants}
+        initial="hidden"
+        animate="visible"
+        className="mt-6"
+      >
+        <SessionMetadataCard audioAnalysisData={audioAnalysis} />
       </motion.div>
 
       {/* Participants Grid */}

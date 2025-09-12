@@ -3,7 +3,6 @@
 import { CreditCard, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { filterPaymentFlags, getPaymentVerdict } from "@/lib/analysis-utils";
 
 interface RedFlag {
   type?: string;
@@ -13,11 +12,52 @@ interface RedFlag {
 }
 
 interface AudioAnalysisData {
-  red_flags?: RedFlag[];
+  red_flags?: (RedFlag | string)[];
 }
 
 interface PaymentVerificationCardProps {
   audioAnalysisData?: AudioAnalysisData;
+}
+
+// Helper function to filter payment-related flags from both string and object formats
+function filterPaymentFlags(flags: (RedFlag | string)[] = []): (RedFlag | string)[] {
+  const paymentKeywords = [
+    'payment',
+    'billing',
+    'pay on your behalf',
+    'fee',
+    'refund',
+    'advance',
+    'cost',
+    'price',
+    'money',
+    'financial',
+    'charge',
+    'invoice',
+    'gst',
+    'catalog',
+    'placement',
+    'faculty'
+  ];
+
+  return flags.filter(flag => {
+    if (typeof flag === 'string') {
+      const flagText = flag.toLowerCase();
+      return paymentKeywords.some(keyword => flagText.includes(keyword));
+    } else {
+      const type = (flag.type || '').toLowerCase();
+      const message = (flag.message || flag.description || '').toLowerCase();
+      return paymentKeywords.some(keyword => 
+        type.includes(keyword) || message.includes(keyword)
+      );
+    }
+  });
+}
+
+// Helper function to get payment verification verdict
+function getPaymentVerdict(flags: (RedFlag | string)[]): "Verified" | "Issues Found" {
+  const paymentFlags = filterPaymentFlags(flags);
+  return paymentFlags.length === 0 ? "Verified" : "Issues Found";
 }
 
 export default function PaymentVerificationCard({ audioAnalysisData }: PaymentVerificationCardProps) {
@@ -55,7 +95,7 @@ export default function PaymentVerificationCard({ audioAnalysisData }: PaymentVe
   const verdict = getPaymentVerdict(redFlags);
 
   return (
-    <Card>
+    <Card className="h-fit">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <CreditCard className="h-5 w-5" />
@@ -65,7 +105,7 @@ export default function PaymentVerificationCard({ audioAnalysisData }: PaymentVe
           Payment status and billing verification
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="space-y-4">
           {/* Verification Status */}
           <div className="flex items-center justify-between">
@@ -93,23 +133,26 @@ export default function PaymentVerificationCard({ audioAnalysisData }: PaymentVe
           {paymentFlags.length > 0 && (
             <div className="space-y-3 pt-2 border-t">
               <span className="text-sm font-medium">Payment-Related Issues</span>
-              <div className="space-y-2">
+              <div className="space-y-2 max-h-48 overflow-y-auto">
                 {paymentFlags.slice(0, 5).map((flag, index) => (
                   <div key={index} className="flex items-start gap-2 p-2 border rounded-lg bg-red-50 border-red-200">
                     <XCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1 space-y-1">
-                      {flag.type && (
-                        <div className="text-xs font-medium text-red-700">
+                    <div className="flex-1 space-y-1 min-w-0">
+                      {typeof flag === 'object' && flag.type && (
+                        <div className="text-xs font-medium text-red-700 break-words">
                           {flag.type}
                         </div>
                       )}
-                      <div className="text-sm text-red-800">
-                        {flag.message || flag.description || 'Payment-related issue detected'}
+                      <div className="text-sm text-red-800 break-words">
+                        {typeof flag === 'string' 
+                          ? flag 
+                          : (flag.message || flag.description || 'Payment-related issue detected')
+                        }
                       </div>
-                      {flag.timestamp && (
+                      {typeof flag === 'object' && flag.timestamp && (
                         <div className="text-xs text-red-600 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {flag.timestamp}
+                          <Clock className="h-3 w-3 flex-shrink-0" />
+                          <span className="break-words">{flag.timestamp}</span>
                         </div>
                       )}
                     </div>

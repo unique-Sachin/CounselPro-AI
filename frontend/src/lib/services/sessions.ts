@@ -107,6 +107,7 @@ export const listSessionsByCounselor = async (
 export const analyzeSession = async (sessionUid: string): Promise<AnalysisTaskResponse> => {
   try {
     const response = await apiHelpers.get<AnalysisTaskResponse>(`/sessions/${sessionUid}/analysis_by_celery`);
+    await new Promise(resolve => setTimeout(resolve, 3000)); // Temporary delay for demo purposes
     return response.data;
   } catch (error) {
     console.error("Failed to start session analysis:", error);

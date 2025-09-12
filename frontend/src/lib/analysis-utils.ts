@@ -13,10 +13,10 @@ interface RedFlag {
 
 /**
  * Filters red flags related to payment issues
- * @param flags - Array of red flags from audio analysis
+ * @param flags - Array of red flags from audio analysis (can be strings or objects)
  * @returns Filtered array of payment-related flags
  */
-export function filterPaymentFlags(flags: RedFlag[] = []): RedFlag[] {
+export function filterPaymentFlags(flags: (RedFlag | string)[] = []): (RedFlag | string)[] {
   const paymentKeywords = [
     'payment',
     'billing',
@@ -29,30 +29,39 @@ export function filterPaymentFlags(flags: RedFlag[] = []): RedFlag[] {
     'money',
     'financial',
     'charge',
-    'invoice'
+    'invoice',
+    'gst',
+    'catalog',
+    'placement',
+    'faculty'
   ];
 
   return flags.filter(flag => {
-    const type = (flag.type || '').toLowerCase();
-    const message = (flag.message || flag.description || '').toLowerCase();
-    
-    return paymentKeywords.some(keyword => 
-      type.includes(keyword) || message.includes(keyword)
-    );
+    if (typeof flag === 'string') {
+      const flagText = flag.toLowerCase();
+      return paymentKeywords.some(keyword => flagText.includes(keyword));
+    } else {
+      const type = (flag.type || '').toLowerCase();
+      const message = (flag.message || flag.description || '').toLowerCase();
+      return paymentKeywords.some(keyword => 
+        type.includes(keyword) || message.includes(keyword)
+      );
+    }
   });
 }
 
 /**
  * Get payment verification verdict based on payment flags
  */
-export function getPaymentVerdict(paymentFlags: RedFlag[]): "Verified" | "Issues Found" {
+export function getPaymentVerdict(flags: (RedFlag | string)[]): "Verified" | "Issues Found" {
+  const paymentFlags = filterPaymentFlags(flags);
   return paymentFlags.length === 0 ? "Verified" : "Issues Found";
 }
 
 /**
  * Filter pressure-related flags from red flags array
  */
-export function filterPressureFlags(flags: RedFlag[] = []): RedFlag[] {
+export function filterPressureFlags(flags: (RedFlag | string)[] = []): (RedFlag | string)[] {
   const pressureKeywords = [
     'pressure',
     'coercion', 
@@ -65,19 +74,23 @@ export function filterPressureFlags(flags: RedFlag[] = []): RedFlag[] {
   ];
 
   return flags.filter(flag => {
-    const type = (flag.type || '').toLowerCase();
-    const message = (flag.message || flag.description || '').toLowerCase();
-    
-    return pressureKeywords.some(keyword => 
-      type.includes(keyword) || message.includes(keyword)
-    );
+    if (typeof flag === 'string') {
+      const flagText = flag.toLowerCase();
+      return pressureKeywords.some(keyword => flagText.includes(keyword));
+    } else {
+      const type = (flag.type || '').toLowerCase();
+      const message = (flag.message || flag.description || '').toLowerCase();
+      return pressureKeywords.some(keyword => 
+        type.includes(keyword) || message.includes(keyword)
+      );
+    }
   });
 }
 
 /**
  * Get pressure severity based on number of pressure flags
  */
-export function getPressureSeverity(pressureFlags: RedFlag[]): "None" | "Low" | "Medium" | "High" {
+export function getPressureSeverity(pressureFlags: (RedFlag | string)[]): "None" | "Low" | "Medium" | "High" {
   const count = pressureFlags.length;
   
   if (count === 0) return "None";

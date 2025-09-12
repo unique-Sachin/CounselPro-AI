@@ -89,7 +89,8 @@ export default function TranscriptViewer({ sessionUid, data }: TranscriptViewerP
     queryKey: ["raw-transcript", sessionUid],
     queryFn: () => getRawTranscript(sessionUid),
     enabled: !!sessionUid,
-    refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,    
+    // refetchInterval: (query) => query.state.data?.status === "STARTED" ? 5000 : false,    
+    refetchInterval:2000,    
   });
 
   // Extract transcript data from API response or use passed data (for backward compatibility)  

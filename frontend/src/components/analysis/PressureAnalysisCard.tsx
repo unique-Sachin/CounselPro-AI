@@ -161,7 +161,10 @@ export default function PressureAnalysisCard({ audioAnalysisData }: PressureAnal
             <div className="space-y-2">
               {topExamples.map((flag, index) => (
                 <div key={index} className="text-sm p-2 bg-orange-50 rounded border-l-2 border-orange-200">
-                  {flag.description || flag.message || flag.type || 'Pressure tactic detected'}
+                  {typeof flag === 'string' 
+                    ? flag 
+                    : (flag.description || flag.message || flag.type || 'Pressure tactic detected')
+                  }
                 </div>
               ))}
               {pressureFlags.length > 3 && (

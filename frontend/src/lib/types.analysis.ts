@@ -105,11 +105,19 @@ export interface AudioAnalysisData {
     description?: string;
     severity?: 'low' | 'medium' | 'high' | 'critical';
     timestamp?: string;
-  }>;
+  } | string>;
   session_metadata?: {
     session_id?: string | null;
     total_utterances?: number;
     counselor_utterances?: number;
+    student_utterances?: number;
+    verification_scope?: string;
+    content_filtering?: string;
+    original_length_words?: number;
+    filtered_length_words?: number;
+    estimated_tokens?: number;
+    processing_method?: string;
+    diarization_note?: string;
   };
 }
 

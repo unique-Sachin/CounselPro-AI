@@ -94,7 +94,7 @@ export const useSessionAnalysisWithPolling = (
   const baseQuery = useSessionAnalysis(sessionUid, queryOptions);
   
   // Determine if we should continue polling based on status
-  const shouldPoll = baseQuery.data?.status === 'STARTED';
+  const shouldPoll = baseQuery.data?.status;
   
   // Create a polling query that inherits from the base query
   const pollingQuery = useSessionAnalysis(sessionUid, {

@@ -54,7 +54,7 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
   const accuracyPercentage = Math.round(accuracyScore * 100);
 
   return (
-    <Card>
+    <Card className="h-fit">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <BarChart3 className="h-5 w-5" />
@@ -64,7 +64,7 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
           Analysis of adherence to counseling protocols
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="space-y-4">
           {/* Big Accuracy Percentage */}
           <div className="text-center">
@@ -86,10 +86,12 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
             {coursesMentioned.length > 0 ? (
               <div className="space-y-2">
                 {coursesMentioned.map((course: CourseInfo, index: number) => (
-                  <div key={index} className="flex items-center justify-between p-2 rounded-md bg-muted/50">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {course.name}
+                  <div key={index} className="p-2 rounded-md bg-muted/50 space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="text-xs max-w-full break-words">
+                        <span className="truncate max-w-[200px]" title={course.name}>
+                          {course.name}
+                        </span>
                       </Badge>
                       {course.match_status && (
                         <Badge 
@@ -101,9 +103,9 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
                       )}
                     </div>
                     {course.confidence_score && (
-                      <span className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         {Math.round(course.confidence_score * 100)}% confidence
-                      </span>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -121,9 +123,11 @@ export default function CourseAccuracyCard({ audioAnalysisData }: CourseAccuracy
           {overallSummary && (
             <div className="space-y-2 pt-2 border-t">
               <span className="text-sm font-medium">Analysis Summary</span>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {overallSummary}
-              </p>
+              <div className="text-sm text-muted-foreground leading-relaxed max-h-32 overflow-y-auto">
+                <p className="break-words">
+                  {overallSummary}
+                </p>
+              </div>
             </div>
           )}
         </div>
