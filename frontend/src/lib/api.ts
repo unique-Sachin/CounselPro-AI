@@ -2,13 +2,14 @@ import axios, { AxiosResponse, AxiosRequestConfig } from "axios";
 import { toast } from "sonner";
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000",
+  baseURL: "https://counselpro-api.duckdns.org",
   // timeout: 30000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
+console.log("process.env.NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL);
 // Request interceptor for auth tokens, etc.
 api.interceptors.request.use(
   (config) => {
