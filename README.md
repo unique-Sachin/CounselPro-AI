@@ -256,15 +256,87 @@ docker-compose up -d
 cd frontend
 docker build -t counselpro-frontend .
 docker run -p 3000:3000 counselpro-frontend
+
 ```
 
-### Production Considerations
-- Use PostgreSQL instead of SQLite
-- Configure Redis for production
-- Set up SSL certificates
-- Configure CORS origins
-- Set up monitoring and logging
-- Implement backup strategies
+
+#    Cost Report — Video Processing Pipeline
+
+This report covers **per-video costs** for CouncelPro AI:  
+- **Transcription**: Deepgram  
+- **Embeddings**: OpenAI `text-embedding-3-large`  
+- **Chat completions**: GPT-4.1  
+- **Frame analysis**: Gemini 1.5 Flash (5-frame analysis, constant per video)  
+- *(Note: Pinecone will also incur ingestion + retrieval charges — see below)*
+
+---
+
+## ⚙️ Assumptions
+- **Transcription (Deepgram)**: $0.00433 per minute  
+- **Embedding (text-embedding-3-large)**: $0.13 per 1M tokens  
+  - 312 tokens for 4.8 min → ~65 tokens/min  
+  - Cost ≈ $0.00000845 per min  
+- **Chat (GPT-4.1)**:  
+  - 1 min → $0.00096  
+  - 5 min → $0.0048  
+  - 1 hr → $0.057  
+- **Gemini 1.5 Flash (5-frame analysis)**: flat **$0.00193 per video**
+
+---
+
+## 💰 Per-Video Cost Breakdown
+
+### 1 minute video
+- Transcription: $0.00433  
+- Embedding: $0.00000845  
+- Chat (GPT-4.1): $0.00096  
+- Gemini 1.5 Flash: $0.00193  
+**➡️ Total = $0.00723 (~0.72 cents)**  
+
+---
+
+### 5 minute video
+- Transcription: $0.02165  
+- Embedding: $0.00004225  
+- Chat (GPT-4.1): $0.00480  
+- Gemini 1.5 Flash: $0.00193  
+**➡️ Total = $0.02842 (~2.84 cents)**  
+
+---
+
+### 1 hour video
+- Transcription: $0.25980  
+- Embedding: $0.000507  
+- Chat (GPT-4.1): $0.05700  
+- Gemini 1.5 Flash: $0.00193  
+**➡️ Total = $0.31924 (~31.9 cents)**  
+
+---
+
+## 📑 Summary Table
+
+| Duration | Transcription | Embedding | Chat (GPT-4.1) | Gemini 5-frame | **Total** |
+|----------|--------------:|----------:|---------------:|---------------:|----------:|
+| **1 min** | $0.00433 | $0.00000845 | $0.00096 | $0.00193 | **$0.00723** |
+| **5 min** | $0.02165 | $0.00004225 | $0.00480 | $0.00193 | **$0.02842** |
+| **1 hr**  | $0.25980 | $0.00050700 | $0.05700 | $0.00193 | **$0.31924** |
+
+---
+
+## 📌 Notes
+- **Transcription dominates costs** (≈75–82% of totals). Optimizing this yields the largest savings.  
+- **Embedding costs are negligible** (<0.2% of totals).  
+- **Gemini’s flat $0.00193/video** is significant for very short clips but negligible for long videos.  
+- **Chat completions** are ~15–18% of costs, especially noticeable on longer inputs.  
+- **Pinecone**: There will be **additional costs** for **document ingestion and retrieval** (pricing depends on index size, vector dimension, and query frequency). These are **not included** in the above numbers.  
+
+---
+
+## 📅 Example Monthly Projections
+- 100 videos of 1 min → **$0.723**  
+- 200 videos of 5 min → **$5.68**  
+- 10 videos of 1 hr → **$3.19**
+
 
 ## 🤝 Contributing
 
