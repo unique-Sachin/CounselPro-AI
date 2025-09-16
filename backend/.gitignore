@@ -80,3 +80,4 @@ dmypy.json
 
 # Other
 *.swp
+credentials.json
