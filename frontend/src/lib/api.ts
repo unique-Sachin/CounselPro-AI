@@ -9,7 +9,6 @@ export const api = axios.create({
   },
 });
 
-console.log("process.env.NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL);
 // Request interceptor for auth tokens, etc.
 api.interceptors.request.use(
   (config) => {
